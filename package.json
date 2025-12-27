@@ -1,0 +1,45 @@
+{
+  "name": "tiny-core-engine",
+  "version": "1.0.0",
+  "description": "Tiny tree-shakable core engine library",
+  "type": "module",
+  "main": "dist/tiny-engine.cjs.js",
+  "module": "dist/tiny-engine.esm.js",
+  "types": "dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/tiny-engine.esm.js",
+      "require": "./dist/tiny-engine.cjs.js",
+      "browser": "./dist/tiny-engine.min.js",
+      "types": "./dist/types/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "gulp build",
+    "watch": "gulp watch",
+    "release": "gulp release",
+    "dev": "gulp"
+  },
+  "keywords": [
+    "tiny",
+    "ui",
+    "runtime",
+    "engine",
+    "tiny-engine",
+    "Tiny engine",
+    "tree-shakable",
+    "Runtime core library",
+    "Tiny engine core library"
+  ],
+  "author": "Urvesh Gohil",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^25.0.3",
+    "esbuild": "^0.27.2",
+    "gulp": "^5.0.1",
+    "gulp-bump": "^3.2.0",
+    "gulp-esbuild": "^0.14.1",
+    "gulp-git": "^2.11.0",
+    "typescript": "^5.9.3"
+  }
+}

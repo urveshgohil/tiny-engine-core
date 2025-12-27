@@ -1,0 +1,22 @@
+{
+    "compilerOptions": {
+        "target": "ES2018",
+        "module": "ES2020",
+        "moduleResolution": "Node",
+        "strict": true,
+        "noImplicitOverride": true,
+        "forceConsistentCasingInFileNames": true,
+        "skipLibCheck": true,
+        "declaration": true,
+        "emitDeclarationOnly": true,
+        "outDir": "dist/types",
+        "rootDir": "src",
+    },
+    "include": [
+        "src/**/*"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist"
+    ]
+}
