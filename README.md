@@ -1,38 +1,38 @@
 # Tiny engine (Core)
 A minimalist, framework-agnostic, and tree‑shakable JavaScript runtime for building interactive UI components—without dependencies.
 
-This core edition gives you lightweight component lifecycle management (register, init, observe, etc.)
-and a simple foundation for your own plugins (accordion, modal, dropdown, etc.).
+This core edition gives you lightweight component lifecycle management (`register`, `init`, `observe`, etc.) and a simple foundation for your own plugins (accordion, modal, dropdown, etc.).
 
 ## Features
-1. Framework‑independent: Works with plain HTML, React, Vue, or Svelte.
-2. Zero dependencies: Pure TypeScript → compiled using Esbuild.
-3. Tree‑shakable: Import only what you need.
-4. Component lifecycle helpers: on(), destroy(), emit(), etc.
-5. Automatic initialization: Discovers elements with ui-* attributes.
-6. Lightweight: ~2KB gzipped.
+1. **Framework‑independent:** Works with plain HTML, React, Vue, or Svelte.
+2. **Zero dependencies:** Pure TypeScript → compiled using Esbuild.
+3. **Tree‑shakable:** Import only what you need.
+4. **Component lifecycle helpers:** `on()`, `destroy()`, `emit()`, etc.
+5. **Automatic initialization:** Discovers elements with configurable `ui-*` attributes (customizable prefix).
+6. **Dynamic prefix support:** `UI.config({ prefix })` + `getPrefix()` utility.
+7. **Lightweight:** ~2KB gzipped.
 
 
 ## Installation
 ### Clone the Repository
 ```bash
-git clone https://github.com/urveshgohil/tiny-core-engine
+git clone https://github.com/urveshgohil/tiny-engine-core
 ```
 
 ### Install Dependencies
 **npm**
 ```bash
-npm install tiny-core-engine
+npm install tiny-engine-core
 ```
 
 **yarn**
 ```bash
-yarn add tiny-core-engine
+yarn add tiny-engine-core
 ```
 
 **pnpm**
 ```bash
-pnpm add tiny-core-engine
+pnpm add tiny-engine-core
 ```
 
 ## Development Workflow
@@ -55,15 +55,20 @@ This will:
 .
 ├── src/               # TypeScript source
 │   ├── core/
-│   │   ├── base.d.ts
-│   │   ├── engine.d.ts
-│   │   └── utils.d.ts
-│   └── index.d.ts
+│   │   ├── base.ts
+│   │   ├── engine.ts
+│   │   └── utils.ts
+│   └── index.ts
 ├── dist/              # Compiled output
+│   ├── types/
+│   │   ├── core/
+│   │   │   ├── base.d.ts
+│   │   │   ├── engine.d.ts
+│   │   │   └── utils.d.ts
+│   │   └── index.d.ts
 │   ├── tiny-engine.min.js
 │   ├── tiny-engine.esm.js
 │   ├── tiny-engine.cjs.js
-│   └── types/
 ├── gulpfile.js        # Build automation (Gulp + Esbuild)
 ├── package.json       # Metadata & dependencies
 ├── README.md
@@ -76,9 +81,9 @@ gulp              # Build all formats + watch
 gulp types        # Types mode only
 gulp release      # Bump patch + build + git commit/tag
 gulp watch        # Watch mode only
-gulp bump:patch   # Bump patch version
-gulp bump:minor   # Bump minor version
-gulp bump:major   # Bump major version
+gulp bump:patch   # Bump patch version (bug fixes)
+gulp bump:minor   # Bump minor version (new features)
+gulp bump:major   # Bump major version (breaking)
 ```
 
 ### Gulp Tasks
@@ -107,26 +112,95 @@ Feel free to submit issues and pull requests to improve the framework-agnostic. 
         console.log('Dropdown initialized!');
         }
     }
-
+    UI.config({ prefix: 'custom' });
     UI.register('dropdown', MyDropdown);
 </script>
 ```
 
 ### In Modern JS (ES Modules)
 ```js
-import { UI, Component } from 'tiny-engine';
+import { UI, Component, getPrefix } from 'tiny-engine-core';
 
-class MyDropdown extends Component {
+class Tabs extends Component {
     constructor(el) {
         super(el);
-        console.log('Dropdown initialized!');
+        const prefix = getPrefix(); // 'ui' or configured prefix
+        console.log(`Tabs using ${prefix}- prefix`);
     }
 }
 
-// Register it
-UI.register('dropdown', MyDropdown);
+UI.config({ prefix: 'app' }); // Optional: change to 'app-'
+UI.register('tabs', Tabs);
 UI.init();
 ```
+
+### Prefix System
+```js
+// Default: ui-*
+UI.register('tabs', Tabs); // Finds [ui-tabs]
+
+// Custom prefix
+UI.config({ prefix: 'app' }); // Finds [app-tabs]
+UI.register('tabs', Tabs);
+
+// In components
+import { getPrefix } from 'tiny-engine-core';
+class MyComponent extends Component {
+    constructor(el) {
+        super(el);
+        const prefix = getPrefix(); // 'app' (syncs with UI.config)
+    }
+}
+```
+
+### Component Base Class
+```js
+class MyComponent extends Component {
+    constructor(el) {
+        super(el, options);
+        this.on(el, 'click', this.handleClick); // Auto-cleanup
+    }
+
+    destroy() { super.destroy(); } // Removes all listeners
+    emit('open', { id: 1 }); // Dispatches CustomEvent
+}
+```
+
+### HTML + Custom Prefix
+```HTML
+<!-- app- prefix (configured via UI.config) -->
+<div app-modal app-backdrop="true">
+    <button app-dismiss="modal">Close</button>
+</div>
+<button app-modal-target="#myModal">Open</button>
+
+```
+
+### React Component
+
+```js
+import { UI, Component } from 'tiny-engine-core';
+
+class Tooltip extends Component {
+    constructor(el) {
+        super(el);
+        this.on(el, 'mouseenter', this.show);
+    }
+}
+
+UI.register('tooltip', Tooltip);
+```
+
+### Complete API Reference
+
+| Feature        | TypeScript                       | JavaScript                   | HTML Example             |
+| -------------- | -------------------------------- | ---------------------------- | ------------------------ |
+| Config         | UI.config({ prefix })            | UI.config({ prefix: 'app' }) | <div app-tabs>           |
+| Register       | UI.register('tabs', Tabs)        | Same                         | <div ui-tabs> (default)  |
+| Prefix Utility | getPrefix()                      | getPrefix()                  | Dynamic selectors        |
+| Init           | UI.init()                        | Same                         | Auto-finds [prefix-name] |
+| Observe        | UI.observe()                     | Same                         | Dynamic content          |
+| Lifecycle      | Component.on/offAll/destroy/emit | Same                         | Event management         |
 
 ### Contributing
 Contributions are welcome!

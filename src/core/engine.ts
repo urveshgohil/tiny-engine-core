@@ -19,7 +19,22 @@ declare global {
     }
 }
 
+export interface UIOptions {
+    /** Custom attribute prefix (default: 'ui') */
+    prefix?: string;
+}
+
+let prefix: string = 'ui'; // Default prefix
+
+export function getPrefix() { return prefix; }
+
 export const UI = (() => {
+
+    // Config API
+    const config = (options: UIOptions = {}) => {
+        if (options.prefix) prefix = options.prefix;
+    };
+
     const registry: Registry = {};
 
     function register(name: string, Ctor: ComponentCtor): void {
@@ -52,7 +67,7 @@ export const UI = (() => {
     function init(root: ParentNode = document): void {
         for (const name of Object.keys(registry)) {
             root
-                .querySelectorAll<HTMLElement>(`[ui-${name}]`)
+                .querySelectorAll<HTMLElement>(`[${prefix}-${name}]`)
                 .forEach((el) => getOrCreate(el, name));
         }
     }
@@ -60,7 +75,7 @@ export const UI = (() => {
     const observer = new MutationObserver((muts) => {
         for (const m of muts) {
             m.addedNodes.forEach((n) => {
-                if (n.nodeType === 1) {
+                if (n?.nodeType === 1) {
                     init(n as Element);
                 }
             });
@@ -74,5 +89,12 @@ export const UI = (() => {
         });
     }
 
-    return { register, init, observe, getOrCreate };
+    return {
+        config,
+        register,
+        init,
+        observe,
+        getOrCreate,
+        getPrefix
+    };
 })();

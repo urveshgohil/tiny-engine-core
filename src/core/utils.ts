@@ -23,10 +23,14 @@ export function parseVal(v: string | null): unknown {
     return v;
 }
 
-export function readOptions(el: HTMLElement, name: string): Record<string, unknown> {
+export function readOptions(
+    el: HTMLElement,
+    name: string,
+    prefix: string = 'ui' // Default prefix
+): Record<string, unknown> {
     const opts: Record<string, unknown> = {};
 
-    const json = el.getAttribute(`ui-${name}`);
+    const json = el.getAttribute(`${prefix}-${name}`);
     if (json) {
         try {
             Object.assign(opts, JSON.parse(json) as object);
@@ -36,7 +40,7 @@ export function readOptions(el: HTMLElement, name: string): Record<string, unkno
     }
 
     for (const attr of Array.from(el.attributes)) {
-        const pfx = `ui-${name}-`;
+        const pfx = `${prefix}-${name}-`;
         if (attr.name.startsWith(pfx)) {
             const key = toCamel(attr.name.slice(pfx.length));
             opts[key] = parseVal(attr.value);
