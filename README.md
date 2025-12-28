@@ -106,7 +106,7 @@ Feel free to submit issues and pull requests to improve the framework-agnostic. 
 ```js
 <script src="dist/tiny-engine.min.js"></script>
 <script>
-    class MyDropdown extends UI.Component {
+    class MyDropdown extends UI.Capsule {
         constructor(el) {
         super(el);
         console.log('Dropdown initialized!');
@@ -119,9 +119,9 @@ Feel free to submit issues and pull requests to improve the framework-agnostic. 
 
 ### In Modern JS (ES Modules)
 ```js
-import { UI, Component, getPrefix } from 'tiny-engine-core';
+import { UI, Capsule, getPrefix } from 'tiny-engine-core';
 
-class Tabs extends Component {
+class Tabs extends Capsule {
     constructor(el) {
         super(el);
         const prefix = getPrefix(); // 'ui' or configured prefix
@@ -145,7 +145,7 @@ UI.register('tabs', Tabs);
 
 // In components
 import { getPrefix } from 'tiny-engine-core';
-class MyComponent extends Component {
+class MyComponent extends Capsule {
     constructor(el) {
         super(el);
         const prefix = getPrefix(); // 'app' (syncs with UI.config)
@@ -153,9 +153,9 @@ class MyComponent extends Component {
 }
 ```
 
-### Component Base Class
+### Capsule Base Class
 ```js
-class MyComponent extends Component {
+class MyComponent extends Capsule {
     constructor(el) {
         super(el, options);
         this.on(el, 'click', this.handleClick); // Auto-cleanup
@@ -176,12 +176,12 @@ class MyComponent extends Component {
 
 ```
 
-### React Component
+### React Capsule
 
 ```js
-import { UI, Component } from 'tiny-engine-core';
+import { UI, Capsule } from 'tiny-engine-core';
 
-class Tooltip extends Component {
+class Tooltip extends Capsule {
     constructor(el) {
         super(el);
         this.on(el, 'mouseenter', this.show);
@@ -193,14 +193,17 @@ UI.register('tooltip', Tooltip);
 
 ### Complete API Reference
 
-| Feature        | TypeScript                       | JavaScript                   | HTML Example             |
-| -------------- | -------------------------------- | ---------------------------- | ------------------------ |
-| Config         | UI.config({ prefix })            | UI.config({ prefix: 'app' }) | <div app-tabs>           |
-| Register       | UI.register('tabs', Tabs)        | Same                         | <div ui-tabs> (default)  |
-| Prefix Utility | getPrefix()                      | getPrefix()                  | Dynamic selectors        |
-| Init           | UI.init()                        | Same                         | Auto-finds [prefix-name] |
-| Observe        | UI.observe()                     | Same                         | Dynamic content          |
-| Lifecycle      | Component.on/offAll/destroy/emit | Same                         | Event management         |
+| Feature        | TypeScript                   | JavaScript | HTML Example             |
+| -------------- | ---------------------------- | ---------- | ------------------------ |
+| Config         | UI.config({ prefix: 'app' }) | Same       | <div app-tabs>           |
+| Register       | UI.register('tabs', Tabs)    | Same       | <div ui-tabs>  (default) |
+| Prefix Utility | getPrefix()                  | Same       | Dynamic selectors        |
+| Init           | UI.init()                    | Same       | Auto-finds [prefix-name] |
+| Observe        | UI.observe()                 | Same       | Dynamic content          |
+| Refs           | this.refs.toggle             | Same       | ref="toggle"             |
+| Directives     | Auto-bound                   | Auto-bound | @click="select('Home')   |
+| Events         | this.emit('change', data)    | Same       | @change="onChange"       |
+| Lifecycle      | on/offAll/destroy            | Same       | Event management         |
 
 ### Contributing
 Contributions are welcome!

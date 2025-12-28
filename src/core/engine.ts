@@ -1,17 +1,17 @@
-import { Component, ComponentOptions } from './base';
-import { readOptions } from './utils';
+import { Capsule, CapsuleOptions } from './base';
+import { readOptions, collectDirectives, collectRefs } from './utils';
 
-export interface ComponentCtor<
-    T extends Component = Component,
-    O extends ComponentOptions = ComponentOptions
+export interface CapsuleCtor<
+    T extends Capsule = Capsule,
+    O extends CapsuleOptions = CapsuleOptions
 > {
     selector?: string;
     defaults?: Partial<O>;
     new(el: HTMLElement, options: O): T;
 }
 
-type Registry = Record<string, ComponentCtor>;
-type InstanceMap = Record<string, Component>;
+type Registry = Record<string, CapsuleCtor>;
+type InstanceMap = Record<string, Capsule>;
 
 declare global {
     interface HTMLElement {
@@ -29,34 +29,34 @@ let prefix: string = 'ui'; // Default prefix
 export function getPrefix() { return prefix; }
 
 export const UI = (() => {
-
-    // Config API
     const config = (options: UIOptions = {}) => {
         if (options.prefix) prefix = options.prefix;
     };
 
     const registry: Registry = {};
 
-    function register(name: string, Ctor: ComponentCtor): void {
+    function register(name: string, Ctor: CapsuleCtor): void {
         Ctor.selector = name;
         registry[name] = Ctor;
     }
 
-    function getOrCreate<T extends Component = Component>(
+    function getOrCreate<T extends Capsule = Capsule>(
         el: HTMLElement,
         name: string,
-        options?: ComponentOptions
+        options?: CapsuleOptions
     ): T | null {
-        const Ctor = registry[name] as ComponentCtor<T> | undefined;
+        const Ctor = registry[name] as CapsuleCtor<T> | undefined;
         if (!Ctor) return null;
 
         if (!el.__ui) el.__ui = {};
         if (!el.__ui[name]) {
-            const opts: ComponentOptions = Object.assign(
+            // ✅ Enhanced options merging
+            const opts: CapsuleOptions = Object.assign(
                 {},
-                Ctor.defaults || {},
-                readOptions(el, name),
-                options || {}
+                Ctor.defaults || {},           // 1. Capsule defaults
+                readOptions(el, name, prefix), // 2. HTML attributes
+                collectDirectives(el, prefix), // 3. Directives become options.@click
+                options || {}                  // 4. Manual options
             );
             el.__ui[name] = new Ctor(el, opts as never);
         }

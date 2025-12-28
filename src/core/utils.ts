@@ -16,9 +16,7 @@ export function parseVal(v: string | null): unknown {
         ) {
             return JSON.parse(v);
         }
-    } catch {
-
-    }
+    } catch { }
 
     return v;
 }
@@ -34,9 +32,7 @@ export function readOptions(
     if (json) {
         try {
             Object.assign(opts, JSON.parse(json) as object);
-        } catch {
-            // ignore
-        }
+        } catch { }
     }
 
     for (const attr of Array.from(el.attributes)) {
@@ -49,3 +45,35 @@ export function readOptions(
 
     return opts;
 }
+
+// TODO: Start Version 1.2.0
+// NEW: @directives (@click, @change, etc.)
+export function collectDirectives(
+    el: HTMLElement,
+    prefix: string
+): Record<string, string> {
+    const directives: Record<string, string> = {};
+
+    for (const attr of Array.from(el.attributes)) {
+        if (attr.name.startsWith('@')) {
+            directives[attr.name.slice(1)] = attr.value;
+        }
+    }
+
+    return directives;
+}
+
+// NEW: collectRefs (ref="myButton")
+export function collectRefs(root: HTMLElement): Record<string, HTMLElement> {
+    const refs: Record<string, HTMLElement> = {};
+
+    root.querySelectorAll('[ref]').forEach((el) => {
+        const refName = (el as HTMLElement).getAttribute('ref');
+        if (refName) {
+            refs[refName] = el as HTMLElement;
+        }
+    });
+
+    return refs;
+}
+// TODO: End
