@@ -1,6 +1,18 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## 1.3.0 (2026-04-04)
+```bash
+├── Dynamic DOM auto-init improvements (root element + nested matches)
+├── Attribute observer support for live ui-* / app-* updates
+├── Delegated @directives engine for dynamic HTML actions
+├── Better ref handling with root refs + lazy ref lookup
+├── Instance sync support for attribute-driven option changes
+├── Safe instance cleanup when nodes are removed from the DOM
+├── Host element instance exposure (el.modal / el.dropdown / etc.)
+└── Core runtime optimization and TypeScript cleanup
+```
+
 ## 1.2.0 (2025-12-27)
 ```bash
 ├── Enhanced Props System (defaults, HTML attrs, model binding)
