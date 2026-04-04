@@ -1,11 +1,29 @@
 import { UI } from './core/engine';
 
 export { Capsule } from './core/base';
-export { toCamel, parseVal, readOptions, collectDirectives, collectRefs } from './core/utils';
+export { CapsuleStore } from './core/store';
+export { generateUID, resetUID } from './core/uid';
+
+export {
+    toCamel,
+    parseVal,
+    readOptions,
+    collectDirectives,
+    collectRefs
+} from './core/utils';
+
 export { UI, getPrefix } from './core/engine';
 
-export type { EventHandle, CapsuleOptions, PropsChangeListener } from './core/base';
-export type { UIOptions, CapsuleCtor } from './core/engine';
+export type {
+    EventHandle,
+    CapsuleOptions,
+    PropsChangeListener
+} from './core/base';
+
+export type {
+    UIOptions,
+    CapsuleCtor
+} from './core/engine';
 
 // Script tag auto-setup (optional)
 declare global {

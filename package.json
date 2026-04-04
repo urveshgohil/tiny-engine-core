@@ -1,6 +1,6 @@
 {
   "name": "tiny-engine-core",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Tiny tree-shakable core engine library",
   "type": "module",
   "main": "dist/tiny-engine.cjs.js",
@@ -45,8 +45,8 @@
   "author": "Urvesh Gohil",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^25.0.3",
-    "esbuild": "^0.27.2",
+    "@types/node": "^25.5.2",
+    "esbuild": "^0.28.0",
     "gulp": "^5.0.1",
     "gulp-bump": "^3.2.0",
     "gulp-esbuild": "^0.14.1",

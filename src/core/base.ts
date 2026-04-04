@@ -1,31 +1,61 @@
-export type EventHandle = [EventTarget, string, EventListenerOrEventListenerObject, AddEventListenerOptions | boolean | undefined];
+import { generateUID, registerUID } from './uid';
+import type { CapsuleStore, CapsuleListener } from './store';
+import { getPrefix } from './engine';
+
+export type EventHandle = [
+    EventTarget,
+    string,
+    EventListenerOrEventListenerObject,
+    AddEventListenerOptions | boolean | undefined
+];
 
 export interface CapsuleOptions {
-    // Capsule-specific props
     [key: string]: unknown;
 }
 
-// TODO: Start Version 1.2.0 NEW: Props
 export interface PropsChangeListener {
     (newValue: unknown, oldValue: unknown, key: string): void;
 }
-// TODO: End
 export class Capsule {
     protected el: HTMLElement;
     protected options: CapsuleOptions;
+    protected uid: string;
+
     private _handles: EventHandle[] = [];
-    // TODO: Start Version 1.2.0
     private _propsListeners = new Map<string, PropsChangeListener[]>();
     private _refs: Record<string, HTMLElement> = {};
-    // TODO: End
+    private _refsProxy?: Record<string, HTMLElement>;
+    private _storeUnsubs: (() => void)[] = [];
+    private _directiveEvents = new Set<string>();
+
+
     constructor(el: HTMLElement, options: CapsuleOptions = {}) {
         this.el = el;
         this.options = { ...options };
-        this._collectRefs(el); // Runs on EVERY instance
-        this._processDirectives(); // Process directives on construction
+
+        const prefix = getPrefix();
+        const idAttr = `${prefix}-id`;
+        const scope = `${prefix}-${this.constructor.name.toLowerCase()}`;
+
+        const existingId = el.getAttribute(idAttr);
+
+        if (existingId) {
+            // SSR / hydration
+            this.uid = existingId;
+            registerUID(existingId);
+        } else {
+            // Client-side
+            this.uid = generateUID(scope);
+            el.setAttribute(idAttr, this.uid);
+        }
+
+        this.uid = el.getAttribute(idAttr) || generateUID(scope);
+        el.setAttribute(idAttr, this.uid);
+
+        this.refresh();
     }
 
-    // TODO: Version 1.2.0 NEW: Props reactive system
+    /* ---------------- PROPS ---------------- */
     get props() {
         return new Proxy(this.options, {
             set: (target, prop: string, value) => {
@@ -44,63 +74,215 @@ export class Capsule {
         this._propsListeners.get(prop)!.push(listener);
     }
 
-    // NEW: refs access
+    /* ---------------- STORE ---------------- */
+
+    protected connectStore<S extends Record<string, any>>(
+        store: CapsuleStore<S>,
+        listener: CapsuleListener<S>
+    ): void {
+        const unsub = store.connect(listener);
+        this._storeUnsubs.push(unsub);
+    }
+
+    /* ---------------- REFS ---------------- */
+
     get refs(): Record<string, HTMLElement> {
-        return this._refs;
+        if (!this._refsProxy) {
+            this._refsProxy = new Proxy(this._refs, {
+                get: (target, prop: string | symbol) => {
+                    if (typeof prop !== 'string') {
+                        return Reflect.get(target, prop);
+                    }
+
+                    const current = target[prop];
+                    if (current?.isConnected) {
+                        return current;
+                    }
+
+                    const found = this._findRef(prop);
+                    if (found) {
+                        target[prop] = found;
+                    }
+
+                    return found;
+                }
+            }) as Record<string, HTMLElement>;
+        }
+
+        return this._refsProxy;
     }
 
     private _notifyPropsListeners(prop: string, newValue: unknown, oldValue: unknown): void {
-        const listeners = this._propsListeners.get(prop);
-        if (listeners) {
-            listeners.forEach(listener => listener(newValue, oldValue, prop));
+        this._propsListeners.get(prop)?.forEach(fn =>
+            fn(newValue, oldValue, prop)
+        );
+    }
+
+    syncOptions(nextOptions: CapsuleOptions): void {
+        const previous = this.options;
+        const next = { ...nextOptions };
+        const keys = new Set([
+            ...Object.keys(previous),
+            ...Object.keys(next)
+        ]);
+
+        this.options = next;
+
+        keys.forEach((key) => {
+            const oldValue = previous[key];
+            const newValue = next[key];
+
+            if (oldValue !== newValue) {
+                this._notifyPropsListeners(key, newValue, oldValue);
+            }
+        });
+    }
+
+    refresh(root: ParentNode = this.el): void {
+        this._collectRefs(root);
+        this._processDirectives(root);
+    }
+
+    private _collectRefs(root: ParentNode): void {
+        if (root instanceof HTMLElement && root.hasAttribute('ref')) {
+            const name = root.getAttribute('ref');
+            if (name) {
+                this._refs[name] = root;
+            }
+        }
+
+        if (!(root instanceof Element)) {
+            return;
+        }
+
+        root.querySelectorAll('[ref]').forEach(el => {
+            const name = el.getAttribute('ref');
+            if (name) this._refs[name] = el as HTMLElement;
+        });
+    }
+
+    private _findRef(name: string): HTMLElement | undefined {
+        if (this.el.getAttribute('ref') === name) {
+            return this.el;
+        }
+
+        return Array.from(this.el.querySelectorAll<HTMLElement>('[ref]'))
+            .find((el) => el.getAttribute('ref') === name);
+    }
+
+    /* ---------------- DIRECTIVES ---------------- */
+
+    private _processDirectives(root: ParentNode): void {
+        const elements = root instanceof Element
+            ? [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))]
+            : [];
+
+        elements.forEach((el) => {
+            Array.from(el.attributes).forEach((attr) => {
+                if (!attr.name.startsWith('@')) return;
+                this._ensureDirectiveListener(attr.name.slice(1));
+            });
+        });
+    }
+
+    private _ensureDirectiveListener(eventName: string): void {
+        if (this._directiveEvents.has(eventName)) {
+            return;
+        }
+
+        this._directiveEvents.add(eventName);
+
+        this.on(this.el, eventName, (event: Event) => {
+            const source = this._findDirectiveTarget(event);
+            if (!source) {
+                return;
+            }
+
+            const expr = source.getAttribute(`@${eventName}`);
+            if (!expr) {
+                return;
+            }
+
+            const result = this._runDirective(expr, event, source);
+            if (result === false) {
+                event.preventDefault();
+            }
+
+            this.emit('directive', {
+                event: eventName,
+                expr,
+                target: source
+            });
+        });
+    }
+
+    private _findDirectiveTarget(event: Event): HTMLElement | null {
+        let node = event.target instanceof HTMLElement
+            ? event.target
+            : event.target instanceof Node
+                ? event.target.parentElement
+                : null;
+
+        while (node && this.el.contains(node)) {
+            if (node.hasAttribute(`@${event.type}`)) {
+                return node;
+            }
+
+            if (node === this.el) {
+                break;
+            }
+
+            node = node.parentElement;
+        }
+
+        return this.el.hasAttribute(`@${event.type}`) ? this.el : null;
+    }
+
+    private _runDirective(expr: string, event: Event, source: HTMLElement): unknown {
+        try {
+            const evaluator = new Function(
+                '$event',
+                '$el',
+                '$component',
+                '$refs',
+                '$props',
+                '$options',
+                `
+                    with ($options) {
+                        with ($props) {
+                            with ($refs) {
+                                with ($component) {
+                                    with (window) {
+                                        return (${expr});
+                                    }
+                                }
+                            }
+                        }
+                    }
+                `
+            );
+
+            const result = evaluator.call(
+                window,
+                event,
+                source,
+                this,
+                this.refs,
+                this.props,
+                this.options
+            );
+
+            if (typeof result === 'function') {
+                return result.call(this, event, source, this);
+            }
+
+            return result;
+        } catch {
+            return undefined;
         }
     }
 
-    private _collectRefs(root: HTMLElement): void {
-        // Local refs collection (runs on constructor)
-        root.querySelectorAll('[ref]').forEach((el) => {
-            const refName = (el as HTMLElement).getAttribute('ref');
-            if (refName) {
-                this._refs[refName] = el as HTMLElement;
-            }
-        });
-    }
-
-    private _processDirectives(): void {
-        Object.entries(this.options).forEach(([key, value]) => {
-            if (key.startsWith('@')) {
-                const event = key.slice(1); // @click → click
-                const expr = value as string;
-
-                // ✅ Parse simple method calls: select('Home')
-                const methodMatch = expr.match(/^(\w+)\((['"])([^'"]+)\2\)$/);
-                if (methodMatch) {
-                    const methodName = methodMatch[1];
-                    const argValue = methodMatch[3];
-
-                    this.el.addEventListener(event, (e: Event) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-
-                        // ✅ Call global method with argument
-                        const globalFn = (window as any)[methodName];
-                        if (typeof globalFn === 'function') {
-                            globalFn(argValue);
-                            console.log(`🔥 Directive executed: ${expr}`);
-                        }
-
-                        // ✅ Emit directive event
-                        this.emit('directive', { event, expr, value: argValue });
-                    });
-                } else if (expr.includes('++') || expr.includes('=')) {
-                    this.el.addEventListener(event, () => {
-                        (window as any).eval(expr); // Secure eval scope
-                    });
-                }
-            }
-        });
-    }
-    // TODO: End
+    /* ---------------- EVENTS ---------------- */
 
     protected on(
         el: EventTarget,
@@ -113,17 +295,19 @@ export class Capsule {
     }
 
     protected offAll(): void {
-        for (const [el, evt, fn, opts] of this._handles) {
-            el.removeEventListener(evt, fn, opts);
-        }
+        this._handles.forEach(([el, evt, fn, opts]) =>
+            el.removeEventListener(evt, fn, opts)
+        );
         this._handles.length = 0;
     }
 
     destroy(): void {
         this.offAll();
-        // TODO: Start Version 1.2.0 Clear props listeners
         this._propsListeners.clear();
-        // TODO: End
+        this._storeUnsubs.forEach(fn => fn());
+        this._storeUnsubs.length = 0;
+        this._directiveEvents.clear();
+        this._refs = {};
     }
 
     protected emit<T = unknown>(
@@ -131,13 +315,13 @@ export class Capsule {
         detail?: T,
         options: { cancelable?: boolean } = {}
     ): CustomEvent<T> {
-        const event = new CustomEvent<T>(name, {
+        const evt = new CustomEvent<T>(name, {
             detail,
             bubbles: true,
             composed: true,
-            cancelable: options.cancelable ?? false,
+            cancelable: options.cancelable ?? false
         });
-        this.el.dispatchEvent(event);
-        return event;
+        this.el.dispatchEvent(evt);
+        return evt;
     }
 }
