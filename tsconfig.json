@@ -2,7 +2,7 @@
     "compilerOptions": {
         "target": "ES2018",
         "module": "ES2020",
-        "moduleResolution": "Node",
+        "moduleResolution": "Bundler",
         "strict": true,
         "noImplicitOverride": true,
         "forceConsistentCasingInFileNames": true,

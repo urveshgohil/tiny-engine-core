@@ -50,13 +50,13 @@ export function readOptions(
 // NEW: @directives (@click, @change, etc.)
 export function collectDirectives(
     el: HTMLElement,
-    prefix: string
+    _prefix: string
 ): Record<string, string> {
     const directives: Record<string, string> = {};
 
     for (const attr of Array.from(el.attributes)) {
         if (attr.name.startsWith('@')) {
-            directives[attr.name.slice(1)] = attr.value;
+            directives[attr.name] = attr.value;
         }
     }
 
@@ -66,6 +66,13 @@ export function collectDirectives(
 // NEW: collectRefs (ref="myButton")
 export function collectRefs(root: HTMLElement): Record<string, HTMLElement> {
     const refs: Record<string, HTMLElement> = {};
+
+    if (root.hasAttribute('ref')) {
+        const rootRefName = root.getAttribute('ref');
+        if (rootRefName) {
+            refs[rootRefName] = root;
+        }
+    }
 
     root.querySelectorAll('[ref]').forEach((el) => {
         const refName = (el as HTMLElement).getAttribute('ref');

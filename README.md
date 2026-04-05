@@ -91,7 +91,7 @@ gulp bump:major   # Bump major version (breaking)
 
 ### Build Pipeline
 1. Gulp 5.0.1 → task runner
-2. Esbuild 0.27.2 → fast bundling and minification
+2. Esbuild 0.28.0 → fast bundling and minification
 3. gulp-bump 3.2.0 → version management
 4. gulp-git 2.11.0 → commit and tagging automation
 
