@@ -57,6 +57,8 @@ This will:
 │   ├── core/
 │   │   ├── base.ts
 │   │   ├── engine.ts
+│   │   ├── store.ts
+│   │   ├── uid.ts
 │   │   └── utils.ts
 │   └── index.ts
 ├── dist/              # Compiled output
@@ -64,6 +66,8 @@ This will:
 │   │   ├── core/
 │   │   │   ├── base.d.ts
 │   │   │   ├── engine.d.ts
+│   │   │   ├── store.d.ts
+│   │   │   ├── uid.d.ts
 │   │   │   └── utils.d.ts
 │   │   └── index.d.ts
 │   ├── tiny-engine.min.js
@@ -106,14 +110,16 @@ Feel free to submit issues and pull requests to improve the framework-agnostic. 
 ```js
 <script src="dist/tiny-engine.min.js"></script>
 <script>
-    class MyDropdown extends UI.Capsule {
-        constructor(el) {
-        super(el);
-        console.log('Dropdown initialized!');
-        }
-    }
-    UI.config({ prefix: 'custom' });
-    UI.register('dropdown', MyDropdown);
+    UI.config({ prefix: 'app' });
+
+    const stop = UI.on('dataapi:trigger', (event) => {
+        console.log('Data API fired:', event.detail.name);
+    });
+
+    UI.emit('app:ready', { version: '1.4.0' });
+
+    // UI.init() and UI.observe() auto-run in the browser build.
+    // Call stop() later if you want to remove the bus listener.
 </script>
 ```
 
@@ -122,9 +128,22 @@ Feel free to submit issues and pull requests to improve the framework-agnostic. 
 import { UI, Capsule, getPrefix } from 'tiny-engine-core';
 
 class Tabs extends Capsule {
-    constructor(el) {
-        super(el);
+    constructor(el, options = {}) {
+        super(el, options);
         const prefix = getPrefix(); // 'ui' or configured prefix
+        this.onPropChange('active', (next) => {
+            console.log('Active tab:', next);
+        });
+
+        this.on(this.el, 'click', (event) => {
+            const action = event.target.closest('[data-tab]');
+            if (!action) return;
+
+            this.props.active = action.getAttribute('data-tab');
+            this.emit('tabs:change', { active: this.props.active });
+            UI.emit('tabs:global-change', { active: this.props.active });
+        });
+
         console.log(`Tabs using ${prefix}- prefix`);
     }
 }
@@ -132,6 +151,7 @@ class Tabs extends Capsule {
 UI.config({ prefix: 'app' }); // Optional: change to 'app-'
 UI.register('tabs', Tabs);
 UI.init();
+UI.observe();
 ```
 
 ### Prefix System
@@ -146,8 +166,8 @@ UI.register('tabs', Tabs);
 // In components
 import { getPrefix } from 'tiny-engine-core';
 class MyComponent extends Capsule {
-    constructor(el) {
-        super(el);
+    constructor(el, options = {}) {
+        super(el, options);
         const prefix = getPrefix(); // 'app' (syncs with UI.config)
     }
 }
@@ -156,54 +176,219 @@ class MyComponent extends Capsule {
 ### Capsule Base Class
 ```js
 class MyComponent extends Capsule {
-    constructor(el) {
+    constructor(el, options = {}) {
         super(el, options);
-        this.on(el, 'click', this.handleClick); // Auto-cleanup
+        this.on(this.el, 'click', this.handleClick); // Auto-cleanup
+        this.onPropChange('open', (next, prev) => {
+            console.log('open changed:', prev, '->', next);
+        });
     }
 
-    destroy() { super.destroy(); } // Removes all listeners
-    emit('open', { id: 1 }); // Dispatches CustomEvent
+    handleClick = () => {
+        const event = this.emit('before:open', { id: 1 }, { cancelable: true });
+        if (event.defaultPrevented) return;
+
+        this.props.open = true;
+        UI.emit('modal:opened', { id: this.uid });
+    };
+
+    destroy() {
+        super.destroy(); // Removes all listeners and store subscriptions
+    }
 }
 ```
 
 ### HTML + Custom Prefix
 ```HTML
 <!-- app- prefix (configured via UI.config) -->
-<div app-modal app-backdrop="true">
-    <button app-dismiss="modal">Close</button>
+<div id="settingsModal" app-modal app-modal-open="false" ref="modal">
+    <button
+        type="button"
+        data-app-toggle="modal"
+        data-app-action="close"
+        data-target="#settingsModal"
+    >
+        Close
+    </button>
 </div>
-<button app-modal-target="#myModal">Open</button>
 
+<button
+    type="button"
+    data-app-toggle="modal"
+    data-target="#settingsModal"
+>
+    Open
+</button>
 ```
 
-### React Capsule
+### React Functional Component
+
+```jsx
+import { useEffect, useRef } from 'react';
+import { UI } from 'tiny-engine-core';
+
+UI.config({ prefix: 'app' });
+UI.register('modal', (el, api) => {
+    const setState = (open) => {
+        api.props.open = open;
+        el.setAttribute('data-state', open ? 'open' : 'closed');
+        UI.emit('modal:change', { open, id: api.uid });
+    };
+
+    return {
+        open() {
+            setState(true);
+        },
+        close() {
+            const event = api.emit('before:close', null, { cancelable: true });
+            if (event.defaultPrevented) return false;
+
+            setState(false);
+            return true;
+        },
+        toggle() {
+            if (api.props.open) return this.close();
+            this.open();
+            return true;
+        }
+    };
+});
+
+export function ModalDemo() {
+    const hostRef = useRef(null);
+
+    useEffect(() => {
+        if (!hostRef.current) return;
+
+        const instance = UI.getOrCreate(hostRef.current, 'modal', { open: false });
+        const off = UI.on('modal:change', (event) => {
+            console.log('Modal changed:', event.detail);
+        });
+
+        return () => {
+            off();
+            instance?.destroy();
+        };
+    }, []);
+
+    return (
+        <>
+            <div ref={hostRef} app-modal app-modal-open="false">
+                React-powered modal host
+            </div>
+
+            <button
+                type="button"
+                data-app-toggle="modal"
+                data-target="[app-modal]"
+            >
+                Toggle modal
+            </button>
+        </>
+    );
+}
+```
+
+### Functional Capsule
 
 ```js
-import { UI, Capsule } from 'tiny-engine-core';
+import { UI } from 'tiny-engine-core';
 
-class Tooltip extends Capsule {
-    constructor(el) {
-        super(el);
-        this.on(el, 'mouseenter', this.show);
+UI.register('modal', (el, api) => {
+    const setState = (open) => {
+        api.props.open = open;
+        el.setAttribute('data-state', open ? 'open' : 'closed');
+        UI.emit('modal:change', { open, id: api.uid });
+    };
+
+    api.onPropChange('open', (open) => {
+        el.setAttribute('aria-hidden', String(!open));
+    });
+
+    return {
+        open() {
+            setState(true);
+        },
+        close() {
+            const event = api.emit('before:close', null, { cancelable: true });
+            if (event.defaultPrevented) return false;
+
+            setState(false);
+            return true;
+        },
+        toggle() {
+            if (api.props.open) return this.close();
+            this.open();
+            return true;
+        },
+        syncOptions(nextOptions) {
+            el.setAttribute('data-state', nextOptions.open ? 'open' : 'closed');
+        },
+        destroy() {
+            el.removeAttribute('data-state');
+        }
+    };
+});
+```
+
+### Store Middleware
+
+```js
+import { CapsuleStore } from 'tiny-engine-core';
+
+const store = new CapsuleStore(
+    (state, action) => {
+        if (action.type === 'increment') {
+            return { ...state, count: state.count + 1 };
+        }
+
+        return state;
+    },
+    { count: 0 }
+);
+
+store.use((action, state) => {
+    console.log('before action:', action.type, state.count);
+
+    if (action.type === 'increment' && state.count >= 10) {
+        return false; // cancel the action
     }
-}
 
-UI.register('tooltip', Tooltip);
+    return action;
+});
+
+store.connect((state, action) => {
+    console.log('after action:', action.type, state.count);
+});
 ```
 
 ### Complete API Reference
 
-| Feature        | TypeScript                   | JavaScript | HTML Example             |
-| -------------- | ---------------------------- | ---------- | ------------------------ |
-| Config         | UI.config({ prefix: 'app' }) | Same       | <div app-tabs>           |
-| Register       | UI.register('tabs', Tabs)    | Same       | <div ui-tabs>  (default) |
-| Prefix Utility | getPrefix()                  | Same       | Dynamic selectors        |
-| Init           | UI.init()                    | Same       | Auto-finds [prefix-name] |
-| Observe        | UI.observe()                 | Same       | Dynamic content          |
-| Refs           | this.refs.toggle             | Same       | ref="toggle"             |
-| Directives     | Auto-bound                   | Auto-bound | @click="select('Home')   |
-| Events         | this.emit('change', data)    | Same       | @change="onChange"       |
-| Lifecycle      | on/offAll/destroy            | Same       | Event management         |
+| Feature                | TypeScript                                       | JavaScript | HTML Example                     |
+| ---------------------- | ------------------------------------------------ | ---------- | -------------------------------- |
+| Config                 | UI.config({ prefix: 'app' })                     | Same       | <div app-tabs>                   |
+| Register               | UI.register('tabs', Tabs)                        | Same       | <div ui-tabs>  (default)         |
+| Prefix Utility         | getPrefix()                                      | Same       | Dynamic selectors                |
+| Init                   | UI.init()                                        | Same       | Auto-finds [prefix-name]         |
+| Observe                | UI.observe()                                     | Same       | Dynamic content                  |
+| Refs                   | this.refs.toggle                                 | Same       | ref="toggle"                     |
+| Directives             | Auto-bound                                       | Auto-bound | @click="select('Home')"          |
+| Events                 | this.emit('change', data)                        | Same       | @change="onChange"               |
+| Lifecycle              | on/offAll/destroy                                | Same       | Event management                 |
+| Auto-init refresh      | `UI.init(root)`                                  | Same       | Nested `[ui-tabs]` mounts        |
+| Attribute observation  | `UI.observe()`                                   | Same       | `ui-tabs-active="2"`             |
+| Dynamic directives     | Delegated `@click` / `@change`                   | Same       | `@click="next()"`                |
+| Root + lazy refs       | `this.refs.panel`                                | Same       | `ref="panel"`                    |
+| Option sync            | `instance.syncOptions(nextOptions)`              | Same       | Live `ui-modal-open="true"`      |
+| Safe DOM cleanup       | `destroy()` on removed nodes                     | Same       | Auto cleanup on DOM removal      |
+| Host instance expose   | `el.tabs`, `el.modal`, `el.dropdown`             | Same       | Direct host element access       |
+| Store middleware       | `store.use((action, state) => action)`           | Same       | Action pipeline                  |
+| Cancelable events      | `this.emit('close', data, { cancelable: true })` | Same       | `event.preventDefault()` support |
+| Data API triggers      | `UI.init()` / `UI.observe()`                     | Same       | `data-ui-toggle="modal"`         |
+| Data target lookup     | Auto target resolution                           | Same       | `data-target="#settingsModal"`   |
+| Global UI bus          | `UI.on('modal:open', fn)` / `UI.emit(...)`       | Same       | Cross-component communication    |
+| Functional capsules    | `UI.register('modal', (el, api) => ({ ... }))`   | Same       | Function-based lifecycle         |
+
 
 ### Contributing
 Contributions are welcome!
