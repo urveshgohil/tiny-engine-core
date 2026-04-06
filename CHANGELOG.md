@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## 1.4.0 (2026-04-05)
+## 1.4.0 (2026-04-06)
 ```bash
 ├── Middleware support for CapsuleStore with store.use(...) hooks
 ├── Cancellable component events via emit(..., { cancelable: true })
