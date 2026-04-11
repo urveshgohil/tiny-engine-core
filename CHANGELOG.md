@@ -1,6 +1,17 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## 1.4.0 (2026-04-06)
+```bash
+├── Middleware support for CapsuleStore with store.use(...) hooks
+├── Cancellable component events via emit(..., { cancelable: true })
+├── Data API for declarative UI triggers with data-hind-toggle / data-target
+├── Global UI event bus with UI.on() / UI.emit() for cross-component sync
+├── Lower-boilerplate developer experience for plugins, analytics, and behaviors
+├── Performance-focused core flow updates for smoother runtime interactions
+└── Dual capsule support for both class-based and functional registration
+```
+
 ## 1.3.0 (2026-04-04)
 ```bash
 ├── Dynamic DOM auto-init improvements (root element + nested matches)
@@ -41,3 +52,5 @@ All notable changes to this project will be documented in this file.
 ```bash
 └── Initial core release
 ```
+
+

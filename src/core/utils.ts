@@ -6,15 +6,15 @@ export function parseVal(v: string | null): unknown {
     if (v === '' || v == null) return true;
     if (v === 'true') return true;
     if (v === 'false') return false;
-    if (v.trim() !== '' && !Number.isNaN(Number(v))) return Number(v);
+    const trimmed = v.trim();
+    if (trimmed !== '' && !Number.isNaN(Number(v))) return Number(v);
 
     try {
         if (
-            typeof v === 'string' &&
-            ((v.startsWith('{') && v.endsWith('}')) ||
-                (v.startsWith('[') && v.endsWith(']')))
+            (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+            (trimmed.startsWith('[') && trimmed.endsWith(']'))
         ) {
-            return JSON.parse(v);
+            return JSON.parse(trimmed);
         }
     } catch { }
 
@@ -27,6 +27,7 @@ export function readOptions(
     prefix: string = 'ui' // Default prefix
 ): Record<string, unknown> {
     const opts: Record<string, unknown> = {};
+    const optionPrefix = `${prefix}-${name}-`;
 
     const json = el.getAttribute(`${prefix}-${name}`);
     if (json) {
@@ -36,14 +37,62 @@ export function readOptions(
     }
 
     for (const attr of Array.from(el.attributes)) {
-        const pfx = `${prefix}-${name}-`;
-        if (attr.name.startsWith(pfx)) {
-            const key = toCamel(attr.name.slice(pfx.length));
+        if (attr.name.startsWith(optionPrefix)) {
+            const key = toCamel(attr.name.slice(optionPrefix.length));
             opts[key] = parseVal(attr.value);
         }
     }
 
     return opts;
+}
+
+export function getDataTarget(
+    trigger: HTMLElement,
+    prefix: string
+): HTMLElement | null {
+    const selector =
+        trigger.getAttribute('data-target') ||
+        trigger.getAttribute(`data-${prefix}-target`) ||
+        getHashSelector(trigger);
+
+    if (!selector) {
+        return null;
+    }
+
+    try {
+        return document.querySelector<HTMLElement>(selector);
+    } catch {
+        return null;
+    }
+}
+
+export function getDataAction(trigger: HTMLElement, prefix: string): string {
+    return trigger.getAttribute(`data-${prefix}-action`) || 'toggle';
+}
+
+export function invokeAction(
+    instance: Record<string, unknown>,
+    action: string,
+    ...args: unknown[]
+): unknown {
+    const direct = instance[action];
+    if (typeof direct === 'function') {
+        return direct.apply(instance, args);
+    }
+
+    if (action === 'toggle') {
+        const fallback = instance.show || instance.open;
+        if (typeof fallback === 'function') {
+            return fallback.apply(instance, args);
+        }
+    }
+
+    return undefined;
+}
+
+function getHashSelector(trigger: HTMLElement): string | null {
+    const href = trigger.getAttribute('href');
+    return href && href.startsWith('#') ? href : null;
 }
 
 // TODO: Start Version 1.2.0
@@ -74,12 +123,12 @@ export function collectRefs(root: HTMLElement): Record<string, HTMLElement> {
         }
     }
 
-    root.querySelectorAll('[ref]').forEach((el) => {
-        const refName = (el as HTMLElement).getAttribute('ref');
+    for (const el of root.querySelectorAll<HTMLElement>('[ref]')) {
+        const refName = el.getAttribute('ref');
         if (refName) {
-            refs[refName] = el as HTMLElement;
+            refs[refName] = el;
         }
-    });
+    }
 
     return refs;
 }

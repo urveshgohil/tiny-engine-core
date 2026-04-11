@@ -23,6 +23,7 @@ export class Capsule {
 
     private _handles: EventHandle[] = [];
     private _propsListeners = new Map<string, PropsChangeListener[]>();
+    private _propsProxy?: CapsuleOptions;
     private _refs: Record<string, HTMLElement> = {};
     private _refsProxy?: Record<string, HTMLElement>;
     private _storeUnsubs: (() => void)[] = [];
@@ -49,22 +50,23 @@ export class Capsule {
             el.setAttribute(idAttr, this.uid);
         }
 
-        this.uid = el.getAttribute(idAttr) || generateUID(scope);
-        el.setAttribute(idAttr, this.uid);
-
         this.refresh();
     }
 
     /* ---------------- PROPS ---------------- */
     get props() {
-        return new Proxy(this.options, {
-            set: (target, prop: string, value) => {
-                const oldValue = target[prop];
-                target[prop] = value;
-                this._notifyPropsListeners(prop, value, oldValue);
-                return true;
-            }
-        });
+        if (!this._propsProxy) {
+            this._propsProxy = new Proxy(this.options, {
+                set: (target, prop: string, value) => {
+                    const oldValue = target[prop];
+                    target[prop] = value;
+                    this._notifyPropsListeners(prop, value, oldValue);
+                    return true;
+                }
+            });
+        }
+
+        return this._propsProxy;
     }
 
     onPropChange(prop: string, listener: PropsChangeListener): void {
@@ -121,21 +123,27 @@ export class Capsule {
     syncOptions(nextOptions: CapsuleOptions): void {
         const previous = this.options;
         const next = { ...nextOptions };
-        const keys = new Set([
-            ...Object.keys(previous),
-            ...Object.keys(next)
-        ]);
+        const keys = new Set<string>();
+
+        for (const key of Object.keys(previous)) {
+            keys.add(key);
+        }
+
+        for (const key of Object.keys(next)) {
+            keys.add(key);
+        }
 
         this.options = next;
+        this._propsProxy = undefined;
 
-        keys.forEach((key) => {
+        for (const key of keys) {
             const oldValue = previous[key];
             const newValue = next[key];
 
             if (oldValue !== newValue) {
                 this._notifyPropsListeners(key, newValue, oldValue);
             }
-        });
+        }
     }
 
     refresh(root: ParentNode = this.el): void {
@@ -155,10 +163,10 @@ export class Capsule {
             return;
         }
 
-        root.querySelectorAll('[ref]').forEach(el => {
+        for (const el of root.querySelectorAll<HTMLElement>('[ref]')) {
             const name = el.getAttribute('ref');
-            if (name) this._refs[name] = el as HTMLElement;
-        });
+            if (name) this._refs[name] = el;
+        }
     }
 
     private _findRef(name: string): HTMLElement | undefined {
@@ -177,12 +185,15 @@ export class Capsule {
             ? [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))]
             : [];
 
-        elements.forEach((el) => {
-            Array.from(el.attributes).forEach((attr) => {
-                if (!attr.name.startsWith('@')) return;
+        for (const el of elements) {
+            for (const attr of Array.from(el.attributes)) {
+                if (!attr.name.startsWith('@')) {
+                    continue;
+                }
+
                 this._ensureDirectiveListener(attr.name.slice(1));
-            });
-        });
+            }
+        }
     }
 
     private _ensureDirectiveListener(eventName: string): void {
@@ -295,19 +306,23 @@ export class Capsule {
     }
 
     protected offAll(): void {
-        this._handles.forEach(([el, evt, fn, opts]) =>
-            el.removeEventListener(evt, fn, opts)
-        );
+        for (const [el, evt, fn, opts] of this._handles) {
+            el.removeEventListener(evt, fn, opts);
+        }
         this._handles.length = 0;
     }
 
     destroy(): void {
         this.offAll();
         this._propsListeners.clear();
-        this._storeUnsubs.forEach(fn => fn());
+        for (const fn of this._storeUnsubs) {
+            fn();
+        }
         this._storeUnsubs.length = 0;
         this._directiveEvents.clear();
         this._refs = {};
+        this._refsProxy = undefined;
+        this._propsProxy = undefined;
     }
 
     protected emit<T = unknown>(

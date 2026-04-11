@@ -8,6 +8,9 @@ export {
     toCamel,
     parseVal,
     readOptions,
+    getDataTarget,
+    getDataAction,
+    invokeAction,
     collectDirectives,
     collectRefs
 } from './core/utils';
@@ -22,8 +25,19 @@ export type {
 
 export type {
     UIOptions,
-    CapsuleCtor
+    CapsuleCtor,
+    CapsuleFn,
+    CapsuleDefinition,
+    FunctionalCapsuleApi,
+    FunctionalCapsuleHooks
 } from './core/engine';
+
+export type {
+    CapsuleAction,
+    CapsuleReducer,
+    CapsuleListener,
+    CapsuleMiddleware
+} from './core/store';
 
 // Script tag auto-setup (optional)
 declare global {
