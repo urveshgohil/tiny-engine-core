@@ -1,6 +1,7 @@
 import { generateUID, registerUID } from './uid';
 import type { CapsuleStore, CapsuleListener } from './store';
 import { getPrefix } from './engine';
+import { debugLog, pushDevtoolsEvent, warnOnce } from './utils';
 
 export type EventHandle = [
     EventTarget,
@@ -16,6 +17,17 @@ export interface CapsuleOptions {
 export interface PropsChangeListener {
     (newValue: unknown, oldValue: unknown, key: string): void;
 }
+
+export interface CapsuleInspection {
+    uid: string;
+    name: string;
+    element: HTMLElement;
+    options: Record<string, unknown>;
+    props: Record<string, unknown>;
+    refs: Record<string, HTMLElement>;
+    refNames: string[];
+}
+
 export class Capsule {
     protected el: HTMLElement;
     protected options: CapsuleOptions;
@@ -29,14 +41,14 @@ export class Capsule {
     private _storeUnsubs: (() => void)[] = [];
     private _directiveEvents = new Set<string>();
 
-
     constructor(el: HTMLElement, options: CapsuleOptions = {}) {
         this.el = el;
         this.options = { ...options };
 
         const prefix = getPrefix();
         const idAttr = `${prefix}-id`;
-        const scope = `${prefix}-${this.constructor.name.toLowerCase()}`;
+        const selector = (this.constructor as typeof Capsule & { selector?: string }).selector;
+        const scope = `${prefix}-${selector || this.constructor.name.toLowerCase()}`;
 
         const existingId = el.getAttribute(idAttr);
 
@@ -50,6 +62,7 @@ export class Capsule {
             el.setAttribute(idAttr, this.uid);
         }
 
+        debugLog('Capsule created.', { uid: this.uid, scope });
         this.refresh();
     }
 
@@ -114,8 +127,26 @@ export class Capsule {
         return this._refsProxy;
     }
 
+    inspect(): CapsuleInspection {
+        return {
+            uid: this.uid,
+            name: (this.constructor as typeof Capsule & { selector?: string }).selector || this.constructor.name,
+            element: this.el,
+            options: { ...this.options },
+            props: { ...this.props },
+            refs: { ...this._refs },
+            refNames: Object.keys(this._refs)
+        };
+    }
+
     private _notifyPropsListeners(prop: string, newValue: unknown, oldValue: unknown): void {
-        this._propsListeners.get(prop)?.forEach(fn =>
+        pushDevtoolsEvent('capsule:prop-change', {
+            uid: this.uid,
+            prop,
+            newValue,
+            oldValue
+        });
+        this._propsListeners.get(prop)?.forEach((fn) =>
             fn(newValue, oldValue, prop)
         );
     }
@@ -144,11 +175,20 @@ export class Capsule {
                 this._notifyPropsListeners(key, newValue, oldValue);
             }
         }
+
+        debugLog('Capsule options synced.', {
+            uid: this.uid,
+            nextOptions: this.options
+        });
     }
 
     refresh(root: ParentNode = this.el): void {
         this._collectRefs(root);
         this._processDirectives(root);
+        pushDevtoolsEvent('capsule:refresh', {
+            uid: this.uid,
+            root: root instanceof HTMLElement ? root : this.el
+        });
     }
 
     private _collectRefs(root: ParentNode): void {
@@ -165,7 +205,9 @@ export class Capsule {
 
         for (const el of root.querySelectorAll<HTMLElement>('[ref]')) {
             const name = el.getAttribute('ref');
-            if (name) this._refs[name] = el;
+            if (name) {
+                this._refs[name] = el;
+            }
         }
     }
 
@@ -177,8 +219,6 @@ export class Capsule {
         return Array.from(this.el.querySelectorAll<HTMLElement>('[ref]'))
             .find((el) => el.getAttribute('ref') === name);
     }
-
-    /* ---------------- DIRECTIVES ---------------- */
 
     private _processDirectives(root: ParentNode): void {
         const elements = root instanceof Element
@@ -288,12 +328,15 @@ export class Capsule {
             }
 
             return result;
-        } catch {
+        } catch (error) {
+            warnOnce('Directive evaluation failed.', {
+                uid: this.uid,
+                expr,
+                error
+            });
             return undefined;
         }
     }
-
-    /* ---------------- EVENTS ---------------- */
 
     protected on(
         el: EventTarget,
@@ -323,6 +366,9 @@ export class Capsule {
         this._refs = {};
         this._refsProxy = undefined;
         this._propsProxy = undefined;
+        pushDevtoolsEvent('capsule:destroy', {
+            uid: this.uid
+        });
     }
 
     protected emit<T = unknown>(
@@ -337,6 +383,12 @@ export class Capsule {
             cancelable: options.cancelable ?? false
         });
         this.el.dispatchEvent(evt);
+        pushDevtoolsEvent('capsule:event', {
+            uid: this.uid,
+            name,
+            detail,
+            cancelable: evt.cancelable
+        });
         return evt;
     }
 }
