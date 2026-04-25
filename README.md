@@ -10,7 +10,7 @@ This core edition gives you lightweight component lifecycle management (`registe
 4. **Component lifecycle helpers:** `on()`, `destroy()`, `emit()`, etc.
 5. **Automatic initialization:** Discovers elements with configurable `ui-*` attributes (customizable prefix).
 6. **Dynamic prefix support:** `UI.config({ prefix })` + `getPrefix()` utility.
-7. **Lightweight:** ~2KB gzipped.
+7. **Lightweight:** ~6KB gzipped.
 
 ## 1.5.0 (2026-04-12)
 [CHANGELOG.md](CHANGELOG.md)
