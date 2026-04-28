@@ -1,4 +1,9 @@
-// Core State Engine (Tiny Engine Native)
+import { generateUID } from './uid';
+import {
+    pushDevtoolsEvent,
+    registerStoreSnapshot,
+    unregisterStoreSnapshot
+} from './utils';
 
 export type CapsuleAction<T = any> = {
     type: string;
@@ -13,23 +18,39 @@ export type CapsuleMiddleware<S> = (
 ) => void | CapsuleAction | false;
 
 export class CapsuleStore<S extends object> {
+    private readonly id: string;
     private state: S;
     private reducer: CapsuleReducer<S>;
     private listeners = new Set<CapsuleListener<S>>();
     private middlewares = new Set<CapsuleMiddleware<S>>();
 
     constructor(reducer: CapsuleReducer<S>, initial: S) {
+        this.id = generateUID('store');
         this.reducer = reducer;
         this.state = structuredClone(initial);
+        this.syncDevtools();
     }
 
     snapshot(): S {
         return this.state;
     }
 
+    inspect(): { id: string; state: S; listeners: number; middlewares: number } {
+        return {
+            id: this.id,
+            state: this.state,
+            listeners: this.listeners.size,
+            middlewares: this.middlewares.size
+        };
+    }
+
     send(action: CapsuleAction): void {
         const nextAction = this.runMiddlewares(action);
         if (!nextAction) {
+            pushDevtoolsEvent('store:action-cancelled', {
+                storeId: this.id,
+                action
+            });
             return;
         }
 
@@ -37,6 +58,12 @@ export class CapsuleStore<S extends object> {
 
         if (next !== this.state) {
             this.state = next;
+            this.syncDevtools();
+            pushDevtoolsEvent('store:action', {
+                storeId: this.id,
+                action: nextAction,
+                state: this.state
+            });
             for (const listener of this.listeners) {
                 listener(this.state, nextAction);
             }
@@ -45,13 +72,30 @@ export class CapsuleStore<S extends object> {
 
     connect(fn: CapsuleListener<S>): () => void {
         this.listeners.add(fn);
+        this.syncDevtools();
         fn(this.state, { type: '__INIT__' });
-        return () => this.listeners.delete(fn);
+        return () => {
+            this.listeners.delete(fn);
+            this.syncDevtools();
+        };
     }
 
     use(middleware: CapsuleMiddleware<S>): () => void {
         this.middlewares.add(middleware);
-        return () => this.middlewares.delete(middleware);
+        this.syncDevtools();
+        return () => {
+            this.middlewares.delete(middleware);
+            this.syncDevtools();
+        };
+    }
+
+    destroy(): void {
+        this.listeners.clear();
+        this.middlewares.clear();
+        unregisterStoreSnapshot(this.id);
+        pushDevtoolsEvent('store:destroy', {
+            storeId: this.id
+        });
     }
 
     private runMiddlewares(action: CapsuleAction): CapsuleAction | null {
@@ -78,5 +122,14 @@ export class CapsuleStore<S extends object> {
         }
 
         return nextAction;
+    }
+
+    private syncDevtools(): void {
+        registerStoreSnapshot({
+            id: this.id,
+            state: this.state,
+            listeners: this.listeners.size,
+            middlewares: this.middlewares.size
+        });
     }
 }

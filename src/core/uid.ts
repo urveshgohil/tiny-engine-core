@@ -1,18 +1,15 @@
+import { pushDevtoolsEvent } from './utils';
+
 const uidMap = new Map<string, number>();
 
-/**
- * Generate a scoped UID like:
- */
 export function generateUID(scope: string): string {
     const count = (uidMap.get(scope) ?? 0) + 1;
     uidMap.set(scope, count);
-    return `${scope}-${count}`;
+    const uid = `${scope}-${count}`;
+    pushDevtoolsEvent('uid:generated', { scope, uid });
+    return uid;
 }
 
-/**
- * Register an existing UID from DOM
- * (used for SSR hydration)
- */
 export function registerUID(uid: string): void {
     const match = uid.match(/^(.*)-(\d+)$/);
     if (!match) return;
@@ -26,11 +23,11 @@ export function registerUID(uid: string): void {
             uidMap.set(scope, n);
         }
     }
+
+    pushDevtoolsEvent('uid:registered', { uid });
 }
 
-/**
- * Reset all UID counters (tests / HMR)
- */
 export function resetUID(): void {
     uidMap.clear();
+    pushDevtoolsEvent('uid:reset');
 }

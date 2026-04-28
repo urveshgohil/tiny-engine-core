@@ -1,6 +1,22 @@
-import { Capsule, CapsuleOptions } from './base';
+import { Capsule, CapsuleInspection, CapsuleOptions } from './base';
 import type { CapsuleListener, CapsuleStore } from './store';
-import { getDataAction, getDataTarget, invokeAction, readOptions } from './utils';
+import {
+    debugLog,
+    describeElement,
+    getDataAction,
+    getDataTarget,
+    getDevtoolsBridge,
+    getRuntimeConfig,
+    invokeAction,
+    pushDevtoolsEvent,
+    readOptions,
+    registerCapsuleDefinition,
+    registerInstanceSnapshot,
+    registerPluginSnapshot,
+    unregisterInstanceSnapshot,
+    updateRuntimeConfig,
+    warnOnce
+} from './utils';
 
 export interface CapsuleCtor<
     T extends Capsule = Capsule,
@@ -64,20 +80,73 @@ export type CapsuleDefinition<
 type Registry = Record<string, CapsuleCtor>;
 type InstanceMap = Record<string, Capsule>;
 
+export interface UIOptions {
+    prefix?: string;
+    debug?: boolean;
+    warnings?: boolean;
+}
+
+export interface UIPluginContext {
+    config(options: UIOptions): void;
+    register(name: string, definition: CapsuleDefinition): void;
+    on(
+        eventName: string,
+        listener: EventListenerOrEventListenerObject,
+        options?: AddEventListenerOptions | boolean
+    ): () => void;
+    off(
+        eventName: string,
+        listener: EventListenerOrEventListenerObject,
+        options?: EventListenerOptions | boolean
+    ): void;
+    emit<T = unknown>(
+        eventName: string,
+        detail?: T,
+        options?: { cancelable?: boolean }
+    ): CustomEvent<T>;
+    getPrefix(): string;
+    devtools(): ReturnType<typeof getDevtoolsBridge>;
+    hook<K extends UIPluginHookName>(
+        name: K,
+        handler: UIPluginHookHandler<K>
+    ): () => void;
+    expose(name: string, value: unknown): void;
+    warn(message: string, detail?: unknown): void;
+    debug(message: string, detail?: unknown): void;
+}
+
+export interface UIPluginObject {
+    name?: string;
+    version?: string;
+    install: UIPluginInstaller;
+}
+
+export type UIPluginInstaller = (
+    ui: UIPluginContext
+) => void | (() => void) | { destroy?(): void };
+
+export type UIPlugin = UIPluginObject | UIPluginInstaller;
+
+export interface UIPluginHookPayloadMap {
+    config: { options: UIOptions };
+    register: { name: string; definition: CapsuleDefinition };
+    create: { name: string; instance: Capsule; el: HTMLElement };
+    destroy: { name: string; instance: Capsule; el: HTMLElement };
+    init: { root: ParentNode };
+    emit: { eventName: string; detail?: unknown; event: CustomEvent<unknown> };
+}
+
+export type UIPluginHookName = keyof UIPluginHookPayloadMap;
+export type UIPluginHookHandler<K extends UIPluginHookName> = (payload: UIPluginHookPayloadMap[K]) => void;
+
 declare global {
     interface HTMLElement {
         __ui?: InstanceMap;
     }
 }
 
-export interface UIOptions {
-    prefix?: string;
-}
-
-let prefix = 'ui';
-
 export function getPrefix() {
-    return prefix;
+    return getRuntimeConfig().prefix;
 }
 
 class FunctionalCapsule<O extends CapsuleOptions = CapsuleOptions> extends Capsule {
@@ -108,16 +177,16 @@ class FunctionalCapsule<O extends CapsuleOptions = CapsuleOptions> extends Capsu
     override syncOptions(nextOptions: O): void {
         const previousOptions = { ...this.options } as O;
         super.syncOptions(nextOptions);
-        this._hooks.syncOptions?.(nextOptions, previousOptions);
+        this._hooks?.syncOptions?.(nextOptions, previousOptions);
     }
 
     override refresh(root: ParentNode = this.el): void {
         super.refresh(root);
-        this._hooks.refresh?.(root);
+        this._hooks?.refresh?.(root);
     }
 
     override destroy(): void {
-        this._hooks.destroy?.();
+        this._hooks?.destroy?.();
         super.destroy();
     }
 
@@ -155,24 +224,86 @@ function isCapsuleCtor(definition: CapsuleDefinition): definition is CapsuleCtor
     return definition === Capsule || definition.prototype instanceof Capsule;
 }
 
+function createHookBucket(): {
+    [K in UIPluginHookName]: Set<UIPluginHookHandler<K>>;
+} {
+    return {
+        config: new Set<UIPluginHookHandler<'config'>>(),
+        register: new Set<UIPluginHookHandler<'register'>>(),
+        create: new Set<UIPluginHookHandler<'create'>>(),
+        destroy: new Set<UIPluginHookHandler<'destroy'>>(),
+        init: new Set<UIPluginHookHandler<'init'>>(),
+        emit: new Set<UIPluginHookHandler<'emit'>>()
+    };
+}
+
+function getPluginName(plugin: UIPlugin, index: number): string {
+    if (typeof plugin === 'function') {
+        return plugin.name || `plugin-${index}`;
+    }
+
+    return plugin.name || plugin.install.name || `plugin-${index}`;
+}
+
+function toInstanceSnapshot(name: string, inspection: CapsuleInspection) {
+    return {
+        ...inspection,
+        name
+    };
+}
+
 export const UI = (() => {
     const registry: Registry = {};
+    const hooks = createHookBucket();
+    const installedPlugins = new WeakSet<object>();
     let observing = false;
     let dataApiBound = false;
+    let pluginCount = 0;
     const bus = new EventTarget();
+    let publicApi: {
+        config: typeof config;
+        register: typeof register;
+        init: typeof init;
+        observe: typeof observe;
+        getOrCreate: typeof getOrCreate;
+        getPrefix: typeof getPrefix;
+        on: typeof on;
+        off: typeof off;
+        emit: typeof emit;
+        use: typeof use;
+        devtools: typeof devtools;
+    };
 
     const config = (options: UIOptions = {}) => {
+        const next: UIOptions = {};
+
         if (options.prefix) {
-            prefix = options.prefix;
+            next.prefix = options.prefix;
         }
+        if (typeof options.debug === 'boolean') {
+            next.debug = options.debug;
+        }
+        if (typeof options.warnings === 'boolean') {
+            next.warnings = options.warnings;
+        }
+
+        updateRuntimeConfig(next);
+        pushDevtoolsEvent('ui:config', { ...getRuntimeConfig() });
+        triggerHook('config', { options: next });
     };
 
     function register(name: string, definition: CapsuleDefinition): void {
+        if (registry[name]) {
+            warnOnce(`Component "${name}" is being re-registered.`, { name });
+        }
+
         let Ctor: CapsuleCtor;
+        let kind: 'class' | 'function' = 'class';
 
         if (isCapsuleCtor(definition)) {
             Ctor = definition;
         } else {
+            kind = 'function';
             const handler = definition;
 
             Ctor = class FunctionalCapsuleAdapter extends FunctionalCapsule {
@@ -187,6 +318,14 @@ export const UI = (() => {
 
         Ctor.selector = name;
         registry[name] = Ctor;
+        registerCapsuleDefinition({
+            name,
+            kind,
+            selector: name,
+            defaults: { ...(Ctor.defaults || {}) }
+        });
+        pushDevtoolsEvent('ui:register', { name, kind });
+        triggerHook('register', { name, definition });
     }
 
     function resolveOptions(
@@ -197,9 +336,13 @@ export const UI = (() => {
         return Object.assign(
             {},
             registry[name]?.defaults || {},
-            readOptions(el, name, prefix),
+            readOptions(el, name, getPrefix()),
             options || {}
         );
+    }
+
+    function syncInstance(name: string, instance: Capsule): void {
+        registerInstanceSnapshot(toInstanceSnapshot(name, instance.inspect()));
     }
 
     function getOrCreate<T extends Capsule = Capsule>(
@@ -209,6 +352,10 @@ export const UI = (() => {
     ): T | null {
         const Ctor = registry[name] as CapsuleCtor<T> | undefined;
         if (!Ctor) {
+            warnOnce(`Component "${name}" is not registered.`, {
+                element: describeElement(el),
+                name
+            });
             return null;
         }
 
@@ -220,8 +367,16 @@ export const UI = (() => {
             const instance = new Ctor(el, resolveOptions(el, name, options) as never);
             el.__ui[name] = instance;
             (el as unknown as Record<string, unknown>)[name] = instance;
+            syncInstance(name, instance);
+            pushDevtoolsEvent('ui:create', {
+                name,
+                uid: instance.inspect().uid,
+                element: el
+            });
+            triggerHook('create', { name, instance, el });
         } else if (options) {
             el.__ui[name].syncOptions(resolveOptions(el, name, options));
+            syncInstance(name, el.__ui[name]);
         }
 
         return el.__ui[name] as T;
@@ -238,11 +393,20 @@ export const UI = (() => {
     }
 
     function init(root: ParentNode = document): void {
+        if (typeof document === 'undefined') {
+            return;
+        }
+
         bindDataApi();
 
         Object.keys(registry).forEach((name) => {
-            findMatches(root, `[${prefix}-${name}]`)
+            findMatches(root, `[${getPrefix()}-${name}]`)
                 .forEach((el) => getOrCreate(el, name));
+        });
+
+        triggerHook('init', { root });
+        pushDevtoolsEvent('ui:init', {
+            root: root instanceof HTMLElement ? root : document.documentElement
         });
     }
 
@@ -252,6 +416,8 @@ export const UI = (() => {
             return;
         }
 
+        triggerHook('destroy', { name, instance, el });
+        unregisterInstanceSnapshot(instance.inspect().uid);
         instance.destroy();
         delete el.__ui?.[name];
 
@@ -304,7 +470,7 @@ export const UI = (() => {
         }
 
         Object.keys(registry).forEach((name) => {
-            const marker = `${prefix}-${name}`;
+            const marker = `${getPrefix()}-${name}`;
             const optionPrefix = `${marker}-`;
 
             if (attributeName !== marker && !attributeName.startsWith(optionPrefix)) {
@@ -315,39 +481,44 @@ export const UI = (() => {
                 const instance = getOrCreate(el, name);
                 instance?.syncOptions(resolveOptions(el, name));
                 instance?.refresh();
+                if (instance) {
+                    syncInstance(name, instance);
+                }
             } else {
                 destroyInstance(el, name);
             }
         });
     }
 
-    const observer = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-            if (mutation.type === 'childList') {
-                for (const node of mutation.addedNodes) {
-                    if (node instanceof HTMLElement) {
-                        init(node);
-                        refreshOwners(node);
+    const observer = typeof MutationObserver === 'undefined'
+        ? null
+        : new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+                if (mutation.type === 'childList') {
+                    for (const node of mutation.addedNodes) {
+                        if (node instanceof HTMLElement) {
+                            init(node);
+                            refreshOwners(node);
+                        }
+                    }
+
+                    for (const node of mutation.removedNodes) {
+                        destroyTree(node);
                     }
                 }
 
-                for (const node of mutation.removedNodes) {
-                    destroyTree(node);
+                if (
+                    mutation.type === 'attributes' &&
+                    mutation.target instanceof HTMLElement &&
+                    mutation.attributeName
+                ) {
+                    syncAttributeChange(mutation.target, mutation.attributeName);
                 }
             }
-
-            if (
-                mutation.type === 'attributes' &&
-                mutation.target instanceof HTMLElement &&
-                mutation.attributeName
-            ) {
-                syncAttributeChange(mutation.target, mutation.attributeName);
-            }
-        }
-    });
+        });
 
     function observe(): void {
-        if (observing) {
+        if (observing || typeof document === 'undefined' || !observer) {
             return;
         }
 
@@ -358,6 +529,7 @@ export const UI = (() => {
             subtree: true,
             attributes: true
         });
+        pushDevtoolsEvent('ui:observe');
     }
 
     function on(
@@ -388,6 +560,16 @@ export const UI = (() => {
         });
 
         bus.dispatchEvent(event);
+        pushDevtoolsEvent('ui:emit', {
+            eventName,
+            detail,
+            cancelable: event.cancelable
+        });
+        triggerHook('emit', {
+            eventName,
+            detail,
+            event: event as CustomEvent<unknown>
+        });
         return event;
     }
 
@@ -406,18 +588,24 @@ export const UI = (() => {
             return;
         }
 
-        const trigger = target.closest<HTMLElement>(`[data-${prefix}-toggle]`);
+        const trigger = target.closest<HTMLElement>(`[data-${getPrefix()}-toggle]`);
         if (!trigger) {
             return;
         }
 
-        const name = trigger.getAttribute(`data-${prefix}-toggle`);
+        const name = trigger.getAttribute(`data-${getPrefix()}-toggle`);
         if (!name) {
+            warnOnce('Data API trigger is missing a component name.', {
+                trigger: describeElement(trigger)
+            });
             return;
         }
 
-        const host = getDataTarget(trigger, prefix);
+        const host = getDataTarget(trigger, getPrefix());
         if (!host) {
+            warnOnce(`Unable to resolve target for data API component "${name}".`, {
+                trigger: describeElement(trigger)
+            });
             return;
         }
 
@@ -426,13 +614,19 @@ export const UI = (() => {
             return;
         }
 
-        const action = getDataAction(trigger, prefix);
+        const action = getDataAction(trigger, getPrefix());
         const result = invokeAction(
             instance as unknown as Record<string, unknown>,
             action,
             event,
             trigger
         );
+
+        if (typeof result === 'undefined') {
+            warnOnce(`Action "${action}" is not available on component "${name}".`, {
+                target: describeElement(host)
+            });
+        }
 
         emit('dataapi:trigger', {
             name,
@@ -447,7 +641,83 @@ export const UI = (() => {
         }
     }
 
-    return {
+    function triggerHook<K extends UIPluginHookName>(
+        name: K,
+        payload: UIPluginHookPayloadMap[K]
+    ): void {
+        for (const handler of hooks[name]) {
+            try {
+                handler(payload as never);
+            } catch (error) {
+                warnOnce(`Plugin hook "${name}" failed.`, error);
+            }
+        }
+    }
+
+    function hook<K extends UIPluginHookName>(
+        name: K,
+        handler: UIPluginHookHandler<K>
+    ): () => void {
+        hooks[name].add(handler as never);
+        return () => hooks[name].delete(handler as never);
+    }
+
+    function devtools() {
+        return getDevtoolsBridge();
+    }
+
+    function use(plugin: UIPlugin) {
+        if (installedPlugins.has(plugin as object)) {
+            warnOnce(`Plugin "${getPluginName(plugin, pluginCount)}" has already been installed.`);
+            return publicApi;
+        }
+
+        pluginCount += 1;
+        installedPlugins.add(plugin as object);
+        const pluginName = getPluginName(plugin, pluginCount);
+        const installer = typeof plugin === 'function' ? plugin : plugin.install;
+        const version = typeof plugin === 'function' ? undefined : plugin.version;
+        const teardownFns: Array<() => void> = [];
+
+        const context: UIPluginContext = {
+            config,
+            register,
+            on,
+            off,
+            emit,
+            getPrefix,
+            devtools,
+            hook: (name, handler) => {
+                const offHook = hook(name, handler as never);
+                teardownFns.push(offHook);
+                return offHook;
+            },
+            expose: (name, value) => {
+                (globalThis as Record<string, unknown>)[name] = value;
+                pushDevtoolsEvent('plugin:expose', { plugin: pluginName, name });
+            },
+            warn: (message, detail) => warnOnce(`[${pluginName}] ${message}`, detail),
+            debug: (message, detail) => debugLog(`[${pluginName}] ${message}`, detail)
+        };
+
+        const installed = installer(context);
+        if (typeof installed === 'function') {
+            teardownFns.push(installed);
+        } else if (installed && typeof installed === 'object' && typeof installed.destroy === 'function') {
+            teardownFns.push(() => installed.destroy?.());
+        }
+
+        registerPluginSnapshot({
+            name: pluginName,
+            version,
+            installedAt: Date.now()
+        });
+        pushDevtoolsEvent('plugin:install', { name: pluginName, version });
+
+        return publicApi;
+    }
+
+    publicApi = {
         config,
         register,
         init,
@@ -456,6 +726,10 @@ export const UI = (() => {
         getPrefix,
         on,
         off,
-        emit
+        emit,
+        use,
+        devtools
     };
+
+    return publicApi;
 })();

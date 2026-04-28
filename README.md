@@ -10,7 +10,10 @@ This core edition gives you lightweight component lifecycle management (`registe
 4. **Component lifecycle helpers:** `on()`, `destroy()`, `emit()`, etc.
 5. **Automatic initialization:** Discovers elements with configurable `ui-*` attributes (customizable prefix).
 6. **Dynamic prefix support:** `UI.config({ prefix })` + `getPrefix()` utility.
-7. **Lightweight:** ~2KB gzipped.
+7. **Lightweight:** ~6KB gzipped.
+
+## 1.5.0 (2026-04-12)
+[CHANGELOG.md](CHANGELOG.md)
 
 
 ## Installation
@@ -116,7 +119,7 @@ Feel free to submit issues and pull requests to improve the framework-agnostic. 
         console.log('Data API fired:', event.detail.name);
     });
 
-    UI.emit('app:ready', { version: '1.4.0' });
+    UI.emit('app:ready', { version: '1.5.0' });
 
     // UI.init() and UI.observe() auto-run in the browser build.
     // Call stop() later if you want to remove the bus listener.
@@ -388,6 +391,9 @@ store.connect((state, action) => {
 | Data target lookup     | Auto target resolution                           | Same       | `data-target="#settingsModal"`   |
 | Global UI bus          | `UI.on('modal:open', fn)` / `UI.emit(...)`       | Same       | Cross-component communication    |
 | Functional capsules    | `UI.register('modal', (el, api) => ({ ... }))`   | Same       | Function-based lifecycle         |
+| DX upgrade             | `UI.config({ debug: true, warnings: true })`     | Same       | Safer developer workflow         |
+| Devtools               | `UI.devtools()` / `window.__TINY_ENGINE__`       | Same       | Inspect runtime internals        |
+| Plugin system          | `UI.use(plugin)`                                 | Same       | Third-party engine extensions    |
 
 
 ### Contributing

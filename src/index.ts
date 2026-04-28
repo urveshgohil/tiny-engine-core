@@ -12,7 +12,9 @@ export {
     getDataAction,
     invokeAction,
     collectDirectives,
-    collectRefs
+    collectRefs,
+    getDevtoolsBridge,
+    getDevtoolsSnapshot
 } from './core/utils';
 
 export { UI, getPrefix } from './core/engine';
@@ -29,7 +31,14 @@ export type {
     CapsuleFn,
     CapsuleDefinition,
     FunctionalCapsuleApi,
-    FunctionalCapsuleHooks
+    FunctionalCapsuleHooks,
+    UIPlugin,
+    UIPluginObject,
+    UIPluginInstaller,
+    UIPluginContext,
+    UIPluginHookName,
+    UIPluginHookHandler,
+    UIPluginHookPayloadMap
 } from './core/engine';
 
 export type {
@@ -38,6 +47,22 @@ export type {
     CapsuleListener,
     CapsuleMiddleware
 } from './core/store';
+
+export type {
+    CapsuleInspection
+} from './core/base';
+
+export type {
+    TinyEngineRuntimeConfig,
+    TinyEngineRegistrySnapshot,
+    TinyEnginePluginSnapshot,
+    TinyEngineCapsuleSnapshot,
+    TinyEngineStoreSnapshot,
+    TinyEngineWarningSnapshot,
+    TinyEngineEventSnapshot,
+    TinyEngineDevtoolsSnapshot,
+    TinyEngineDevtoolsBridge
+} from './core/utils';
 
 // Script tag auto-setup (optional)
 declare global {

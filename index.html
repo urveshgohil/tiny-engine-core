@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tiny Engine Core 1.5.0 Demo</title>
+    <style>
+        :root {
+            --bg: linear-gradient(135deg, #f4efe6 0%, #e2ece8 48%, #f8f7f1 100%);
+            --ink: #16211d;
+            --muted: #5c6b64;
+            --panel: rgba(255, 252, 246, 0.88);
+            --line: rgba(22, 33, 29, 0.12);
+            --accent: #0b7a5c;
+            --accent-soft: #d8f0e6;
+            --gold: #d8a12d;
+            --shadow: 0 18px 40px rgba(18, 32, 27, 0.12);
+            --mono: "IBM Plex Mono", "Fira Code", monospace;
+            --display: Georgia, "Times New Roman", serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: var(--mono);
+            color: var(--ink);
+            background: var(--bg);
+        }
+
+        .page {
+            width: min(1120px, calc(100vw - 32px));
+            margin: 0 auto;
+            padding: 32px 0 56px;
+        }
+
+        .hero {
+            padding: 28px;
+            border: 1px solid var(--line);
+            border-radius: 28px;
+            background:
+                radial-gradient(circle at top right, rgba(216, 161, 45, 0.22), transparent 34%),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.56));
+            box-shadow: var(--shadow);
+        }
+
+        .eyebrow {
+            margin: 0 0 10px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        h1, h2 {
+            font-family: var(--display);
+            margin: 0;
+        }
+
+        h1 {
+            font-size: clamp(2.2rem, 5vw, 4.2rem);
+            line-height: 0.95;
+            max-width: 10ch;
+        }
+
+        .lead {
+            margin: 16px 0 0;
+            max-width: 70ch;
+            color: var(--muted);
+            line-height: 1.7;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 18px;
+            margin-top: 24px;
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            padding: 20px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(12px);
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            font-size: 12px;
+        }
+
+        .controls,
+        .mini-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        button {
+            appearance: none;
+            border: 0;
+            cursor: pointer;
+            border-radius: 14px;
+            padding: 12px 16px;
+            font: inherit;
+            transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn-primary {
+            background: var(--ink);
+            color: #fff;
+            box-shadow: 0 10px 18px rgba(22, 33, 29, 0.18);
+        }
+
+        .btn-secondary {
+            background: #fff;
+            color: var(--ink);
+            border: 1px solid var(--line);
+        }
+
+        .counter-value {
+            font-family: var(--display);
+            font-size: clamp(3rem, 8vw, 4.8rem);
+            line-height: 1;
+            margin: 18px 0 6px;
+        }
+
+        .muted {
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .plugin-panel[data-state="open"] {
+            outline: 2px solid rgba(11, 122, 92, 0.25);
+        }
+
+        .plugin-panel[data-state="closed"] .panel-body {
+            display: none;
+        }
+
+        .status-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .log {
+            list-style: none;
+            padding: 0;
+            margin: 16px 0 0;
+            display: grid;
+            gap: 8px;
+            max-height: 240px;
+            overflow: auto;
+        }
+
+        .log li {
+            border-radius: 12px;
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid var(--line);
+            color: var(--muted);
+        }
+
+        pre {
+            margin: 16px 0 0;
+            padding: 16px;
+            border-radius: 18px;
+            background: #111714;
+            color: #dbf6e8;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            overflow: auto;
+            min-height: 260px;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .feature-list {
+            display: grid;
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        .feature-item {
+            padding: 14px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.66);
+            border: 1px solid var(--line);
+        }
+
+        .feature-item strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        @media (max-width: 720px) {
+            .page {
+                width: min(100vw - 20px, 1120px);
+                padding-top: 20px;
+            }
+
+            .hero,
+            .card {
+                border-radius: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <section class="hero">
+            <p class="eyebrow">Tiny Engine Core</p>
+            <h1>Version 1.5.0 DX Upgrade Demo</h1>
+            <p class="lead">
+                This page shows how to use the new developer-experience features in this project:
+                debug mode, runtime devtools, and the plugin system with `UI.use(plugin)`.
+            </p>
+            <div class="grid">
+                <div class="card">
+                    <span class="badge">DX Upgrade</span>
+                    <div class="feature-list">
+                        <div class="feature-item">
+                            <strong>Debug + warnings</strong>
+                            Turn on `UI.config({ debug: true, warnings: true })` for friendlier development feedback.
+                        </div>
+                        <div class="feature-item">
+                            <strong>Devtools bridge</strong>
+                            Inspect runtime state with `UI.devtools()` or `window.__TINY_ENGINE__`.
+                        </div>
+                        <div class="feature-item">
+                            <strong>Plugin system</strong>
+                            Install add-ons with `UI.use(plugin)` to hook create, init, emit, and more.
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <span class="badge">What this demo uses</span>
+                    <p class="muted">
+                        One class capsule, one functional capsule, one store with middleware,
+                        one plugin, and a live devtools snapshot panel.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- features 1.5.0 -->
+        <section class="grid" style="margin-top: 22px;">
+            <article class="card" app-counter app-counter-step="1">
+                <p class="eyebrow">Class Capsule</p>
+                <h2>Counter Capsule</h2>
+                <div class="counter-value" ref="value">0</div>
+                <p class="muted" ref="meta">Waiting for store sync...</p>
+                <div class="controls">
+                    <button class="btn-primary" type="button" data-counter-action="increment">Increment</button>
+                    <button class="btn-secondary" type="button" data-counter-action="decrement">Decrement</button>
+                    <button class="btn-secondary" type="button" data-counter-action="reset">Reset</button>
+                </div>
+            </article>
+
+            <article class="card plugin-panel" id="pluginPanel" app-devpanel app-devpanel-open="false">
+                <p class="eyebrow">Functional Capsule</p>
+                <h2>Plugin Panel</h2>
+                <div class="status-row">
+                    <span class="badge">State: <strong ref="stateLabel">closed</strong></span>
+                    <button
+                        class="btn-secondary"
+                        type="button"
+                        data-app-toggle="devpanel"
+                        data-app-action="toggle"
+                        data-target="#pluginPanel"
+                    >
+                        Toggle via Data API
+                    </button>
+                </div>
+                <div class="panel-body">
+                    <p class="muted">
+                        This capsule is registered with `UI.register('devpanel', (el, api) => ({ ... }))`
+                        and toggled by the 1.4+ Data API.
+                    </p>
+                    <div class="mini-actions">
+                        <button class="btn-primary" type="button" id="pluginPing">Plugin Ping</button>
+                        <button class="btn-secondary" type="button" id="clearEvents">Clear Events</button>
+                    </div>
+                </div>
+            </article>
+        </section>
+
+        <section class="grid" style="margin-top: 18px;">
+            <article class="card">
+                <p class="eyebrow">Plugin Log</p>
+                <h2>Runtime Hooks</h2>
+                <p class="muted">
+                    The demo plugin listens to `init`, `create`, and `emit` hooks and writes to this log.
+                </p>
+                <ul id="pluginLog" class="log"></ul>
+            </article>
+
+            <article class="card">
+                <p class="eyebrow">Devtools</p>
+                <h2>Live Snapshot</h2>
+                <p class="muted">
+                    Refresh to inspect current components, stores, events, warnings, and installed plugins.
+                </p>
+                <div class="mini-actions">
+                    <button class="btn-primary" type="button" id="refreshDevtools">Refresh Snapshot</button>
+                    <button class="btn-secondary" type="button" id="inspectGlobal">Inspect Global Bridge</button>
+                </div>
+                <pre id="devtoolsOutput">Loading devtools snapshot...</pre>
+            </article>
+        </section>
+    </main>
+
+    <script type="module" src="./index.demo.js"></script>
+</body>
+</html>

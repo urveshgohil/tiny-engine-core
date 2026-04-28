@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## 1.5.0 (2026-04-12)
+```bash
+├── DX Upgrade with better TypeScript ergonomics, warnings, debug mode, and clearer APIs
+├── Devtools layer for inspecting capsules, props, refs, signals, stores, and emitted events
+└── Plugin system with `UI.use(plugin)` style extension architecture for third-party addons
+```
+
 ## 1.4.0 (2026-04-06)
 ```bash
 ├── Middleware support for CapsuleStore with store.use(...) hooks
