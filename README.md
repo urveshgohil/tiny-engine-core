@@ -3,6 +3,8 @@ A minimalist, framework-agnostic, and tree‑shakable JavaScript runtime for bui
 
 This core edition gives you lightweight component lifecycle management (`register`, `init`, `observe`, etc.) and a simple foundation for your own plugins (accordion, modal, dropdown, etc.).
 
+[Tiny Engine (Core)](https://demo.urveshgohil.in/tiny-engine/)
+
 ## Features
 1. **Framework‑independent:** Works with plain HTML, React, Vue, or Svelte.
 2. **Zero dependencies:** Pure TypeScript → compiled using Esbuild.
