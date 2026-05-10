@@ -3,12 +3,12 @@ All notable changes to this project will be documented in this file.
 
 ## 1.6.0 (2026-05-09)
 ```bash
-+ UI.destroy(root?) for explicit teardown during framework unmounts, HMR, route changes, and micro-frontends
-+ UI.scan(root) for manual partial initialization of portals, AJAX blocks, and hydration islands
-+ Batched DOM scheduler using microtasks plus animation frames for observer-driven scans and option syncs
-+ Hydration mode via UI.config({ hydrate: true }) for SSR-safe resume behavior and no-op option sync skipping
-+ Improved lifecycle timing data with devtools performance metrics for creates, destroys, scans, syncs, emits, and flushes
-+ Plugin context support for scan() and destroy() so framework adapters can manage mount/unmount boundaries
+├── UI.destroy(root?) for explicit teardown during framework unmounts, HMR, route changes, and micro-frontends
+├── UI.scan(root) for manual partial initialization of portals, AJAX blocks, and hydration islands
+├── Batched DOM scheduler using microtasks plus animation frames for observer-driven scans and option syncs
+├── Hydration mode via UI.config({ hydrate: true }) for SSR-safe resume behavior and no-op option sync skipping
+├── Improved lifecycle timing data with devtools performance metrics for creates, destroys, scans, syncs, emits, and flushes
+└── Plugin context support for scan() and destroy() so framework adapters can manage mount/unmount boundaries
 ```
 
 ## 1.5.0 (2026-04-12)
