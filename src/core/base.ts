@@ -1,7 +1,7 @@
 import { generateUID, registerUID } from './uid';
 import type { CapsuleStore, CapsuleListener } from './store';
 import { getPrefix } from './engine';
-import { debugLog, pushDevtoolsEvent, warnOnce } from './utils';
+import { debugLog, getRuntimeConfig, pushDevtoolsEvent, warnOnce } from './utils';
 
 export type EventHandle = [
     EventTarget,
@@ -59,7 +59,9 @@ export class Capsule {
         } else {
             // Client-side
             this.uid = generateUID(scope);
-            el.setAttribute(idAttr, this.uid);
+            if (!getRuntimeConfig().hydrate || el.getAttribute(idAttr) !== this.uid) {
+                el.setAttribute(idAttr, this.uid);
+            }
         }
 
         debugLog('Capsule created.', { uid: this.uid, scope });

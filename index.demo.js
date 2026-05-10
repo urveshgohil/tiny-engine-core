@@ -2,6 +2,7 @@ import { UI, Capsule, CapsuleStore } from './dist/tiny-engine.esm.js';
 
 const pluginLogEl = document.getElementById('pluginLog');
 const devtoolsOutputEl = document.getElementById('devtoolsOutput');
+const islandHostEl = document.getElementById('islandHost');
 
 const appendLog = (message) => {
     const item = document.createElement('li');
@@ -16,7 +17,8 @@ const appendLog = (message) => {
 UI.config({
     prefix: 'app',
     debug: true,
-    warnings: true
+    warnings: true,
+    hydrate: true
 });
 
 const counterStore = new CapsuleStore((state, action) => {
@@ -116,9 +118,9 @@ UI.register('devpanel', (el, api) => {
 
 const devtoolsPlugin = {
     name: 'demo-devtools-plugin',
-    version: '1.0.0',
+    version: '1.6.0',
     install(ui) {
-        ui.debug('Installing DX demo plugin');
+        ui.debug('Installing 1.6 demo plugin');
         let didLogDocumentInit = false;
 
         const offInit = ui.hook('init', ({ root }) => {
@@ -138,6 +140,19 @@ const devtoolsPlugin = {
             appendLog(`plugin:create -> ${name} on <${el.tagName.toLowerCase()}>`);
         });
 
+        const offScan = ui.hook('scan', ({ root }) => {
+            const rootLabel = root === document
+                ? 'document'
+                : root instanceof HTMLElement
+                    ? `<${root.tagName.toLowerCase()}>`
+                    : 'node';
+            appendLog(`plugin:scan -> ${rootLabel}`);
+        });
+
+        const offDestroy = ui.hook('destroy', ({ name, instance }) => {
+            appendLog(`plugin:destroy -> ${name} (${instance.uid})`);
+        });
+
         const offEmit = ui.hook('emit', ({ eventName }) => {
             appendLog(`plugin:emit -> ${eventName}`);
         });
@@ -146,12 +161,22 @@ const devtoolsPlugin = {
             ping() {
                 ui.emit('plugin:ping', { source: 'tinyEngineDemoPlugin' });
                 appendLog('plugin:ping -> exposed helper fired');
+            },
+            scan(root = document) {
+                ui.scan(root);
+                appendLog('plugin:scan helper -> invoked');
+            },
+            destroy(root) {
+                ui.destroy(root);
+                appendLog(`plugin:destroy helper -> ${root ? 'scoped' : 'global'}`);
             }
         });
 
         return () => {
             offInit();
             offCreate();
+            offScan();
+            offDestroy();
             offEmit();
         };
     }
@@ -199,6 +224,7 @@ const renderDevtools = () => {
     const safeSnapshot = {
         version: snapshot.version,
         config: snapshot.config,
+        metrics: snapshot.metrics,
         registry: snapshot.registry,
         plugins: snapshot.plugins,
         stores: snapshot.stores,
@@ -227,6 +253,46 @@ const renderDevtools = () => {
     }
 };
 
+const islandMarkup = () => `
+    <section id="dynamicIsland" class="card plugin-panel" app-devpanel app-devpanel-open="false">
+        <p class="eyebrow">Scoped Subtree</p>
+        <h2>Hydration Island</h2>
+        <p class="muted">Mounted after init and then activated via UI.scan(root).</p>
+        <div class="mini-actions">
+            <button
+                class="btn-secondary"
+                type="button"
+                data-app-toggle="devpanel"
+                data-app-action="toggle"
+                data-target="#dynamicIsland"
+            >
+                Toggle Island Panel
+            </button>
+        </div>
+    </section>
+`;
+
+const mountIsland = () => {
+    islandHostEl.innerHTML = islandMarkup();
+    appendLog('demo:mount -> island markup inserted');
+};
+
+const getIsland = () => document.getElementById('dynamicIsland');
+
+const stressSync = () => {
+    const counterEl = document.querySelector('[app-counter]');
+    if (!counterEl) {
+        appendLog('demo:stress -> counter host missing');
+        return;
+    }
+
+    for (let i = 0; i < 80; i += 1) {
+        counterEl.setAttribute('app-counter-step', String((i % 5) + 1));
+    }
+
+    appendLog('demo:stress -> 80 attribute sync writes queued');
+};
+
 document.getElementById('refreshDevtools').addEventListener('click', renderDevtools);
 document.getElementById('inspectGlobal').addEventListener('click', () => {
     console.log('window.__TINY_ENGINE__', window.__TINY_ENGINE__);
@@ -241,9 +307,51 @@ document.getElementById('clearEvents').addEventListener('click', () => {
     appendLog('devtools:clearEvents -> event buffer cleared');
     renderDevtools();
 });
+document.getElementById('mountIsland').addEventListener('click', () => {
+    mountIsland();
+    renderDevtools();
+});
+document.getElementById('scanIsland').addEventListener('click', () => {
+    const island = getIsland();
+    if (!island) {
+        appendLog('demo:scan -> island not mounted');
+        return;
+    }
+
+    UI.scan(island);
+    appendLog('demo:scan -> scoped scan complete');
+    renderDevtools();
+});
+document.getElementById('destroyIsland').addEventListener('click', () => {
+    const island = getIsland();
+    if (!island) {
+        appendLog('demo:destroy -> island not mounted');
+        return;
+    }
+
+    UI.destroy(island);
+    appendLog('demo:destroy -> scoped destroy complete');
+    renderDevtools();
+});
+document.getElementById('destroyAll').addEventListener('click', () => {
+    UI.destroy();
+    appendLog('demo:destroy -> global destroy complete');
+    renderDevtools();
+});
+document.getElementById('remountAll').addEventListener('click', () => {
+    UI.scan(document);
+    UI.observe();
+    appendLog('demo:remount -> scan(document) + observe()');
+    renderDevtools();
+});
+document.getElementById('stressSync').addEventListener('click', () => {
+    stressSync();
+    requestAnimationFrame(renderDevtools);
+});
 
 UI.on('counter:change', () => renderDevtools());
 UI.on('devpanel:change', () => renderDevtools());
 UI.on('plugin:ping', () => renderDevtools());
 
+mountIsland();
 requestAnimationFrame(renderDevtools);

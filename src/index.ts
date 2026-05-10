@@ -58,6 +58,7 @@ export type {
     TinyEnginePluginSnapshot,
     TinyEngineCapsuleSnapshot,
     TinyEngineStoreSnapshot,
+    TinyEnginePerformanceMetrics,
     TinyEngineWarningSnapshot,
     TinyEngineEventSnapshot,
     TinyEngineDevtoolsSnapshot,

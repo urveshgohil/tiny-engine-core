@@ -2,6 +2,18 @@ export interface TinyEngineRuntimeConfig {
     prefix: string;
     debug: boolean;
     warnings: boolean;
+    hydrate: boolean;
+}
+
+export interface TinyEnginePerformanceMetrics {
+    creates: number;
+    destroys: number;
+    emits: number;
+    scans: number;
+    syncs: number;
+    flushes: number;
+    lastFlushDuration: number;
+    lastScanDuration: number;
 }
 
 export interface TinyEngineRegistrySnapshot {
@@ -49,6 +61,7 @@ export interface TinyEngineEventSnapshot {
 export interface TinyEngineDevtoolsSnapshot {
     version: string;
     config: TinyEngineRuntimeConfig;
+    metrics: TinyEnginePerformanceMetrics;
     registry: TinyEngineRegistrySnapshot[];
     plugins: TinyEnginePluginSnapshot[];
     instances: TinyEngineCapsuleSnapshot[];
@@ -62,11 +75,22 @@ export interface TinyEngineDevtoolsBridge extends TinyEngineDevtoolsSnapshot {
     clearEvents(): void;
 }
 
-const ENGINE_VERSION = '1.5.0';
+const ENGINE_VERSION = '1.6.0';
 const runtimeConfig: TinyEngineRuntimeConfig = {
     prefix: 'ui',
     debug: false,
-    warnings: true
+    warnings: true,
+    hydrate: false
+};
+const metrics: TinyEnginePerformanceMetrics = {
+    creates: 0,
+    destroys: 0,
+    emits: 0,
+    scans: 0,
+    syncs: 0,
+    flushes: 0,
+    lastFlushDuration: 0,
+    lastScanDuration: 0
 };
 
 const registry = new Map<string, TinyEngineRegistrySnapshot>();
@@ -110,6 +134,7 @@ function ensureDevtoolsBridge(): TinyEngineDevtoolsBridge {
         host.__TINY_ENGINE__ = {
             version: ENGINE_VERSION,
             config: runtimeConfig,
+            metrics,
             registry: [],
             plugins: [],
             instances: [],
@@ -131,6 +156,7 @@ function syncBridge(): TinyEngineDevtoolsBridge {
     const bridge = ensureDevtoolsBridge();
     bridge.version = ENGINE_VERSION;
     bridge.config = runtimeConfig;
+    bridge.metrics = metrics;
     bridge.registry = Array.from(registry.values());
     bridge.plugins = Array.from(plugins.values());
     bridge.instances = Array.from(instances.values());
@@ -147,6 +173,20 @@ export function getRuntimeConfig(): TinyEngineRuntimeConfig {
 export function updateRuntimeConfig(next: Partial<TinyEngineRuntimeConfig>): TinyEngineRuntimeConfig {
     Object.assign(runtimeConfig, next);
     return syncBridge().config;
+}
+
+export function recordMetric(
+    name: keyof TinyEnginePerformanceMetrics,
+    value?: number
+): TinyEnginePerformanceMetrics {
+    if (typeof value === 'number') {
+        metrics[name] = value;
+    } else {
+        metrics[name] += 1;
+    }
+
+    syncBridge();
+    return metrics;
 }
 
 export function debugLog(message: string, detail?: unknown): void {
@@ -248,6 +288,7 @@ export function getDevtoolsSnapshot(): TinyEngineDevtoolsSnapshot {
     return {
         version: ENGINE_VERSION,
         config: { ...runtimeConfig },
+        metrics: { ...metrics },
         registry: Array.from(registry.values()).map((entry) => ({
             ...entry,
             defaults: cloneValue(entry.defaults)
