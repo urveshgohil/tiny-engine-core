@@ -12,9 +12,9 @@ This core edition gives you lightweight component lifecycle management (`registe
 4. **Component lifecycle helpers:** `on()`, `destroy()`, `emit()`, etc.
 5. **Automatic initialization:** Discovers elements with configurable `ui-*` attributes (customizable prefix).
 6. **Dynamic prefix support:** `UI.config({ prefix })` + `getPrefix()` utility.
-7. **Lightweight:** ~6KB gzipped.
+7. **Lightweight:** approx. 6KB gzipped.
 
-## 1.5.0 (2026-04-12)
+## 1.6.0 (2026-05-09)
 [CHANGELOG.md](CHANGELOG.md)
 
 
@@ -121,7 +121,7 @@ Feel free to submit issues and pull requests to improve the framework-agnostic. 
         console.log('Data API fired:', event.detail.name);
     });
 
-    UI.emit('app:ready', { version: '1.5.0' });
+    UI.emit('app:ready', { version: '1.6.0' });
 
     // UI.init() and UI.observe() auto-run in the browser build.
     // Call stop() later if you want to remove the bus listener.
@@ -157,6 +157,33 @@ UI.config({ prefix: 'app' }); // Optional: change to 'app-'
 UI.register('tabs', Tabs);
 UI.init();
 UI.observe();
+```
+
+### v1.6.0 Production Runtime APIs
+```js
+import { UI } from 'tiny-engine-core';
+
+UI.config({
+    prefix: 'app',
+    hydrate: true // Trust SSR markup and avoid no-op option writes.
+});
+
+UI.register('modal', Modal);
+
+// Full document boot.
+UI.init();
+UI.observe();
+
+// Partial scan for portals, AJAX blocks, route fragments, or hydration islands.
+UI.scan(document.querySelector('#route-fragment'));
+
+// Explicit teardown for React/Vue unmounts, route changes, HMR, or micro-frontends.
+UI.destroy(document.querySelector('#route-fragment'));
+
+// Call with no root to destroy all active capsules and stop global observers.
+UI.destroy();
+
+console.log(UI.devtools().inspect().metrics);
 ```
 
 ### Prefix System
@@ -263,16 +290,17 @@ export function ModalDemo() {
     const hostRef = useRef(null);
 
     useEffect(() => {
-        if (!hostRef.current) return;
+        const host = hostRef.current;
+        if (!host) return;
 
-        const instance = UI.getOrCreate(hostRef.current, 'modal', { open: false });
+        UI.getOrCreate(host, 'modal', { open: false });
         const off = UI.on('modal:change', (event) => {
             console.log('Modal changed:', event.detail);
         });
 
         return () => {
             off();
-            instance?.destroy();
+            UI.destroy(host);
         };
     }, []);
 
@@ -372,9 +400,11 @@ store.connect((state, action) => {
 | Feature                | TypeScript                                       | JavaScript | HTML Example                     |
 | ---------------------- | ------------------------------------------------ | ---------- | -------------------------------- |
 | Config                 | UI.config({ prefix: 'app' })                     | Same       | <div app-tabs>                   |
+| Hydration              | UI.config({ hydrate: true })                     | Same       | SSR-safe resume mode             |
 | Register               | UI.register('tabs', Tabs)                        | Same       | <div ui-tabs>  (default)         |
 | Prefix Utility         | getPrefix()                                      | Same       | Dynamic selectors                |
 | Init                   | UI.init()                                        | Same       | Auto-finds [prefix-name]         |
+| Partial scan           | UI.scan(root)                                    | Same       | Hydration islands / portals      |
 | Observe                | UI.observe()                                     | Same       | Dynamic content                  |
 | Refs                   | this.refs.toggle                                 | Same       | ref="toggle"                     |
 | Directives             | Auto-bound                                       | Auto-bound | @click="select('Home')"          |
@@ -385,7 +415,7 @@ store.connect((state, action) => {
 | Dynamic directives     | Delegated `@click` / `@change`                   | Same       | `@click="next()"`                |
 | Root + lazy refs       | `this.refs.panel`                                | Same       | `ref="panel"`                    |
 | Option sync            | `instance.syncOptions(nextOptions)`              | Same       | Live `ui-modal-open="true"`      |
-| Safe DOM cleanup       | `destroy()` on removed nodes                     | Same       | Auto cleanup on DOM removal      |
+| Safe DOM cleanup       | `UI.destroy(root?)`                              | Same       | Explicit cleanup on unmount      |
 | Host instance expose   | `el.tabs`, `el.modal`, `el.dropdown`             | Same       | Direct host element access       |
 | Store middleware       | `store.use((action, state) => action)`           | Same       | Action pipeline                  |
 | Cancelable events      | `this.emit('close', data, { cancelable: true })` | Same       | `event.preventDefault()` support |
@@ -395,6 +425,7 @@ store.connect((state, action) => {
 | Functional capsules    | `UI.register('modal', (el, api) => ({ ... }))`   | Same       | Function-based lifecycle         |
 | DX upgrade             | `UI.config({ debug: true, warnings: true })`     | Same       | Safer developer workflow         |
 | Devtools               | `UI.devtools()` / `window.__TINY_ENGINE__`       | Same       | Inspect runtime internals        |
+| Performance metrics    | `UI.devtools().inspect().metrics`                | Same       | Creates, scans, flush timings    |
 | Plugin system          | `UI.use(plugin)`                                 | Same       | Third-party engine extensions    |
 
 

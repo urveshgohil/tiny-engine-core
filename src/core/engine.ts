@@ -10,6 +10,7 @@ import {
     invokeAction,
     pushDevtoolsEvent,
     readOptions,
+    recordMetric,
     registerCapsuleDefinition,
     registerInstanceSnapshot,
     registerPluginSnapshot,
@@ -84,11 +85,14 @@ export interface UIOptions {
     prefix?: string;
     debug?: boolean;
     warnings?: boolean;
+    hydrate?: boolean;
 }
 
 export interface UIPluginContext {
     config(options: UIOptions): void;
     register(name: string, definition: CapsuleDefinition): void;
+    scan(root?: ParentNode | null): void;
+    destroy(root?: ParentNode | null): void;
     on(
         eventName: string,
         listener: EventListenerOrEventListenerObject,
@@ -133,6 +137,7 @@ export interface UIPluginHookPayloadMap {
     create: { name: string; instance: Capsule; el: HTMLElement };
     destroy: { name: string; instance: Capsule; el: HTMLElement };
     init: { root: ParentNode };
+    scan: { root: ParentNode };
     emit: { eventName: string; detail?: unknown; event: CustomEvent<unknown> };
 }
 
@@ -233,6 +238,7 @@ function createHookBucket(): {
         create: new Set<UIPluginHookHandler<'create'>>(),
         destroy: new Set<UIPluginHookHandler<'destroy'>>(),
         init: new Set<UIPluginHookHandler<'init'>>(),
+        scan: new Set<UIPluginHookHandler<'scan'>>(),
         emit: new Set<UIPluginHookHandler<'emit'>>()
     };
 }
@@ -264,6 +270,8 @@ export const UI = (() => {
         config: typeof config;
         register: typeof register;
         init: typeof init;
+        scan: typeof scan;
+        destroy: typeof destroy;
         observe: typeof observe;
         getOrCreate: typeof getOrCreate;
         getPrefix: typeof getPrefix;
@@ -285,6 +293,9 @@ export const UI = (() => {
         }
         if (typeof options.warnings === 'boolean') {
             next.warnings = options.warnings;
+        }
+        if (typeof options.hydrate === 'boolean') {
+            next.hydrate = options.hydrate;
         }
 
         updateRuntimeConfig(next);
@@ -345,6 +356,64 @@ export const UI = (() => {
         registerInstanceSnapshot(toInstanceSnapshot(name, instance.inspect()));
     }
 
+    const scheduleFrame = (callback: () => void) => {
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(callback);
+            return;
+        }
+
+        setTimeout(callback, 0);
+    };
+
+    const scheduleMicrotask = (callback: () => void) => {
+        if (typeof queueMicrotask === 'function') {
+            queueMicrotask(callback);
+            return;
+        }
+
+        Promise.resolve().then(callback);
+    };
+
+    const scheduledTasks = new Set<() => void>();
+    let flushQueued = false;
+
+    function scheduleDomTask(task: () => void): void {
+        scheduledTasks.add(task);
+
+        if (flushQueued) {
+            return;
+        }
+
+        flushQueued = true;
+        scheduleMicrotask(() => {
+            scheduleFrame(flushScheduledTasks);
+        });
+    }
+
+    function flushScheduledTasks(): void {
+        flushQueued = false;
+        const tasks = Array.from(scheduledTasks);
+        scheduledTasks.clear();
+        const startedAt = performanceNow();
+
+        for (const task of tasks) {
+            task();
+        }
+
+        recordMetric('flushes');
+        recordMetric('lastFlushDuration', performanceNow() - startedAt);
+        pushDevtoolsEvent('ui:scheduler:flush', {
+            tasks: tasks.length,
+            duration: performanceNow() - startedAt
+        });
+    }
+
+    function performanceNow(): number {
+        return typeof performance !== 'undefined' && typeof performance.now === 'function'
+            ? performance.now()
+            : Date.now();
+    }
+
     function getOrCreate<T extends Capsule = Capsule>(
         el: HTMLElement,
         name: string,
@@ -368,6 +437,7 @@ export const UI = (() => {
             el.__ui[name] = instance;
             (el as unknown as Record<string, unknown>)[name] = instance;
             syncInstance(name, instance);
+            recordMetric('creates');
             pushDevtoolsEvent('ui:create', {
                 name,
                 uid: instance.inspect().uid,
@@ -375,11 +445,30 @@ export const UI = (() => {
             });
             triggerHook('create', { name, instance, el });
         } else if (options) {
-            el.__ui[name].syncOptions(resolveOptions(el, name, options));
-            syncInstance(name, el.__ui[name]);
+            const nextOptions = resolveOptions(el, name, options);
+            if (!getRuntimeConfig().hydrate || !optionsEqual(el.__ui[name].inspect().options, nextOptions)) {
+                el.__ui[name].syncOptions(nextOptions);
+                recordMetric('syncs');
+                syncInstance(name, el.__ui[name]);
+            }
         }
 
         return el.__ui[name] as T;
+    }
+
+    function optionsEqual(
+        previous: Record<string, unknown>,
+        next: Record<string, unknown>
+    ): boolean {
+        const keys = new Set([...Object.keys(previous), ...Object.keys(next)]);
+
+        for (const key of keys) {
+            if (previous[key] !== next[key]) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     function findMatches(root: ParentNode, selector: string): HTMLElement[] {
@@ -392,21 +481,38 @@ export const UI = (() => {
             : [];
     }
 
-    function init(root: ParentNode = document): void {
-        if (typeof document === 'undefined') {
+    function scan(root?: ParentNode | null): void {
+        if (typeof document === 'undefined' || root === null) {
             return;
         }
 
+        const target = root || document;
+        const startedAt = performanceNow();
         bindDataApi();
 
         Object.keys(registry).forEach((name) => {
-            findMatches(root, `[${getPrefix()}-${name}]`)
+            findMatches(target, `[${getPrefix()}-${name}]`)
                 .forEach((el) => getOrCreate(el, name));
         });
 
-        triggerHook('init', { root });
+        recordMetric('scans');
+        recordMetric('lastScanDuration', performanceNow() - startedAt);
+        triggerHook('scan', { root: target });
+        pushDevtoolsEvent('ui:scan', {
+            root: target instanceof HTMLElement ? target : document.documentElement
+        });
+    }
+
+    function init(root?: ParentNode | null): void {
+        if (typeof document === 'undefined' || root === null) {
+            return;
+        }
+
+        const target = root || document;
+        scan(target);
+        triggerHook('init', { root: target });
         pushDevtoolsEvent('ui:init', {
-            root: root instanceof HTMLElement ? root : document.documentElement
+            root: target instanceof HTMLElement ? target : document.documentElement
         });
     }
 
@@ -419,6 +525,7 @@ export const UI = (() => {
         triggerHook('destroy', { name, instance, el });
         unregisterInstanceSnapshot(instance.inspect().uid);
         instance.destroy();
+        recordMetric('destroys');
         delete el.__ui?.[name];
 
         if (Object.keys(el.__ui || {}).length === 0) {
@@ -442,6 +549,39 @@ export const UI = (() => {
                 destroyInstance(el, name);
             }
         }
+    }
+
+    function destroy(root?: ParentNode | null): void {
+        if (typeof document === 'undefined' || root === null) {
+            return;
+        }
+
+        const target = root || document;
+
+        if (!root && observer) {
+            observer.disconnect();
+            observing = false;
+        }
+
+        if (!root && dataApiBound) {
+            document.removeEventListener('click', handleDataApiClick);
+            dataApiBound = false;
+        }
+
+        if (!root) {
+            scheduledTasks.clear();
+            flushQueued = false;
+        }
+
+        if (target instanceof HTMLElement) {
+            destroyTree(target);
+        } else if (target instanceof Document) {
+            destroyTree(target.documentElement);
+        }
+
+        pushDevtoolsEvent('ui:destroy', {
+            root: target instanceof HTMLElement ? target : document.documentElement
+        });
     }
 
     function refreshOwners(node: Node): void {
@@ -479,7 +619,11 @@ export const UI = (() => {
 
             if (el.hasAttribute(marker)) {
                 const instance = getOrCreate(el, name);
-                instance?.syncOptions(resolveOptions(el, name));
+                const nextOptions = resolveOptions(el, name);
+                if (instance && (!getRuntimeConfig().hydrate || !optionsEqual(instance.inspect().options, nextOptions))) {
+                    instance.syncOptions(nextOptions);
+                    recordMetric('syncs');
+                }
                 instance?.refresh();
                 if (instance) {
                     syncInstance(name, instance);
@@ -497,13 +641,15 @@ export const UI = (() => {
                 if (mutation.type === 'childList') {
                     for (const node of mutation.addedNodes) {
                         if (node instanceof HTMLElement) {
-                            init(node);
-                            refreshOwners(node);
+                            scheduleDomTask(() => {
+                                scan(node);
+                                refreshOwners(node);
+                            });
                         }
                     }
 
                     for (const node of mutation.removedNodes) {
-                        destroyTree(node);
+                        scheduleDomTask(() => destroyTree(node));
                     }
                 }
 
@@ -512,7 +658,9 @@ export const UI = (() => {
                     mutation.target instanceof HTMLElement &&
                     mutation.attributeName
                 ) {
-                    syncAttributeChange(mutation.target, mutation.attributeName);
+                    const target = mutation.target;
+                    const attributeName = mutation.attributeName;
+                    scheduleDomTask(() => syncAttributeChange(target, attributeName));
                 }
             }
         });
@@ -560,6 +708,7 @@ export const UI = (() => {
         });
 
         bus.dispatchEvent(event);
+        recordMetric('emits');
         pushDevtoolsEvent('ui:emit', {
             eventName,
             detail,
@@ -682,6 +831,8 @@ export const UI = (() => {
         const context: UIPluginContext = {
             config,
             register,
+            scan,
+            destroy,
             on,
             off,
             emit,
@@ -721,6 +872,8 @@ export const UI = (() => {
         config,
         register,
         init,
+        scan,
+        destroy,
         observe,
         getOrCreate,
         getPrefix,

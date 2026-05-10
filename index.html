@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tiny Engine Core 1.5.0 Demo</title>
+    <title>Tiny Engine Core 1.6.0 Demo</title>
     <style>
         :root {
             --bg: linear-gradient(135deg, #f4efe6 0%, #e2ece8 48%, #f8f7f1 100%);
@@ -228,40 +228,40 @@
     <main class="page">
         <section class="hero">
             <p class="eyebrow">Tiny Engine Core</p>
-            <h1>Version 1.5.0 DX Upgrade Demo</h1>
+            <h1>Version 1.6.0 Runtime Demo</h1>
             <p class="lead">
-                This page shows how to use the new developer-experience features in this project:
-                debug mode, runtime devtools, and the plugin system with `UI.use(plugin)`.
+                This page shows scoped scanning, explicit destroy, hydrate mode, scheduled observer batching,
+                plugin hooks, and live runtime metrics from the devtools bridge.
             </p>
             <div class="grid">
                 <div class="card">
-                    <span class="badge">DX Upgrade</span>
+                    <span class="badge">v1.6.0</span>
                     <div class="feature-list">
                         <div class="feature-item">
-                            <strong>Debug + warnings</strong>
-                            Turn on `UI.config({ debug: true, warnings: true })` for friendlier development feedback.
+                            <strong>Manual scan + destroy</strong>
+                            Use `UI.scan(root?)` and `UI.destroy(root?)` for route-level mounts and unmounts.
                         </div>
                         <div class="feature-item">
-                            <strong>Devtools bridge</strong>
-                            Inspect runtime state with `UI.devtools()` or `window.__TINY_ENGINE__`.
+                            <strong>Hydrate mode</strong>
+                            Enable `UI.config({ hydrate: true })` to resume SSR markup without pointless sync writes.
                         </div>
                         <div class="feature-item">
-                            <strong>Plugin system</strong>
-                            Install add-ons with `UI.use(plugin)` to hook create, init, emit, and more.
+                            <strong>Batched observer work</strong>
+                            Child and attribute mutations flush through microtask + animation-frame scheduling.
                         </div>
                     </div>
                 </div>
                 <div class="card">
                     <span class="badge">What this demo uses</span>
                     <p class="muted">
-                        One class capsule, one functional capsule, one store with middleware,
-                        one plugin, and a live devtools snapshot panel.
+                        One class capsule, one functional capsule, one store with middleware, one plugin,
+                        and a controls panel that exercises scan/destroy and batched mutations.
                     </p>
                 </div>
             </div>
         </section>
 
-        <!-- features 1.5.0 -->
+        <!-- features 1.6.0 -->
         <section class="grid" style="margin-top: 22px;">
             <article class="card" app-counter app-counter-step="1">
                 <p class="eyebrow">Class Capsule</p>
@@ -305,10 +305,28 @@
 
         <section class="grid" style="margin-top: 18px;">
             <article class="card">
+                <p class="eyebrow">Runtime Controls</p>
+                <h2>Scan + Destroy</h2>
+                <p class="muted">
+                    These buttons mount and unmount a scoped subtree and trigger high-frequency option mutations to
+                    demonstrate scheduler batching.
+                </p>
+                <div class="mini-actions">
+                    <button class="btn-primary" type="button" id="mountIsland">Mount Island</button>
+                    <button class="btn-secondary" type="button" id="scanIsland">Scan Island</button>
+                    <button class="btn-secondary" type="button" id="destroyIsland">Destroy Island</button>
+                    <button class="btn-secondary" type="button" id="destroyAll">Destroy All</button>
+                    <button class="btn-secondary" type="button" id="remountAll">Remount All</button>
+                    <button class="btn-secondary" type="button" id="stressSync">Stress Sync (Batch)</button>
+                </div>
+                <div id="islandHost" style="margin-top:16px;"></div>
+            </article>
+
+            <article class="card">
                 <p class="eyebrow">Plugin Log</p>
                 <h2>Runtime Hooks</h2>
                 <p class="muted">
-                    The demo plugin listens to `init`, `create`, and `emit` hooks and writes to this log.
+                    The demo plugin listens to `init`, `scan`, `create`, `destroy`, and `emit` hooks.
                 </p>
                 <ul id="pluginLog" class="log"></ul>
             </article>
