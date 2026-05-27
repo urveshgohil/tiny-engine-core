@@ -466,9 +466,14 @@ export const UI = (() => {
         previous: Record<string, unknown>,
         next: Record<string, unknown>
     ): boolean {
-        const keys = new Set([...Object.keys(previous), ...Object.keys(next)]);
+        const previousKeys = Object.keys(previous);
+        const nextKeys = Object.keys(next);
 
-        for (const key of keys) {
+        if (previousKeys.length !== nextKeys.length) {
+            return false;
+        }
+
+        for (const key of previousKeys) {
             if (previous[key] !== next[key]) {
                 return false;
             }
@@ -494,12 +499,13 @@ export const UI = (() => {
 
         const target = root || document;
         const startedAt = performanceNow();
+        const prefix = getPrefix();
         bindDataApi();
 
-        Object.keys(registry).forEach((name) => {
-            findMatches(target, `[${getPrefix()}-${name}]`)
+        for (const name of Object.keys(registry)) {
+            findMatches(target, `[${prefix}-${name}]`)
                 .forEach((el) => getOrCreate(el, name));
-        });
+        }
 
         recordMetric('scans');
         recordMetric('lastScanDuration', performanceNow() - startedAt);
@@ -548,9 +554,11 @@ export const UI = (() => {
             return;
         }
 
-        const nodes = [node, ...Array.from(node.querySelectorAll<HTMLElement>('*'))];
+        for (const name of Object.keys(node.__ui || {})) {
+            destroyInstance(node, name);
+        }
 
-        for (const el of nodes) {
+        for (const el of node.querySelectorAll<HTMLElement>('*')) {
             for (const name of Object.keys(el.__ui || {})) {
                 destroyInstance(el, name);
             }
@@ -599,8 +607,10 @@ export const UI = (() => {
         let current: HTMLElement | null = node;
 
         while (current) {
-            for (const instance of Object.values(current.__ui || {})) {
-                owners.add(instance);
+            if (current.__ui) {
+                for (const name of Object.keys(current.__ui)) {
+                    owners.add(current.__ui[name]);
+                }
             }
             current = current.parentElement;
         }
@@ -615,12 +625,14 @@ export const UI = (() => {
             refreshOwners(el);
         }
 
-        Object.keys(registry).forEach((name) => {
-            const marker = `${getPrefix()}-${name}`;
+        const prefix = getPrefix();
+
+        for (const name of Object.keys(registry)) {
+            const marker = `${prefix}-${name}`;
             const optionPrefix = `${marker}-`;
 
             if (attributeName !== marker && !attributeName.startsWith(optionPrefix)) {
-                return;
+                continue;
             }
 
             if (el.hasAttribute(marker)) {
@@ -637,7 +649,7 @@ export const UI = (() => {
             } else {
                 destroyInstance(el, name);
             }
-        });
+        }
     }
 
     const observer = typeof MutationObserver === 'undefined'
@@ -846,9 +858,12 @@ export const UI = (() => {
     ): void {
         for (const handler of hooks[name]) {
             try {
-                Promise.resolve(handler(payload as never)).catch((error) => {
-                    warnOnce(`Plugin hook "${name}" failed.`, error);
-                });
+                const result = handler(payload as never);
+                if (isThenable(result)) {
+                    result.catch((error) => {
+                        warnOnce(`Plugin hook "${name}" failed.`, error);
+                    });
+                }
             } catch (error) {
                 warnOnce(`Plugin hook "${name}" failed.`, error);
             }

@@ -189,9 +189,12 @@ export class TinyRequest {
             return;
         }
 
-        for (const activeKey of Array.from(this.controllers.keys())) {
-            this.abortKey(activeKey);
+        for (const bucket of this.controllers.values()) {
+            for (const controller of bucket) {
+                controller.abort();
+            }
         }
+        this.controllers.clear();
     }
 
     cache(enabled: boolean | number = true): this {
@@ -331,7 +334,7 @@ export class TinyRequest {
         controller: AbortController,
         context: TinyRequestContext
     ): Promise<RequestInit> {
-        const headers = mergeHeaders(this.defaults.headers, options.headers);
+        const headers = new Headers(options.headers);
         let payload = body as BodyInit | undefined;
 
         if (body !== undefined && isPlainObject(body)) {
