@@ -15,7 +15,7 @@ This core edition gives you lightweight component lifecycle management (`registe
 7. **TinyRequest:** A tiny dependency-free request layer built on native fetch with timeout, retry, abort, caching, and interceptors.
 8. **Lightweight:** approx. 6KB gzipped.
 
-## 1.7.0 (2026-05-27)
+## 1.7.1 (2026-05-27)
 [CHANGELOG.md](CHANGELOG.md)
 
 
