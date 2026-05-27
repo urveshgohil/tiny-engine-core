@@ -138,11 +138,14 @@ export interface UIPluginHookPayloadMap {
     destroy: { name: string; instance: Capsule; el: HTMLElement };
     init: { root: ParentNode };
     scan: { root: ParentNode };
+    action: { name: string; action: string; trigger: HTMLElement; target: HTMLElement; instance: Capsule; event: Event };
+    actionComplete: { name: string; action: string; trigger: HTMLElement; target: HTMLElement; instance: Capsule; result: unknown };
+    actionError: { name: string; action: string; trigger: HTMLElement; target: HTMLElement; instance: Capsule; error: unknown };
     emit: { eventName: string; detail?: unknown; event: CustomEvent<unknown> };
 }
 
 export type UIPluginHookName = keyof UIPluginHookPayloadMap;
-export type UIPluginHookHandler<K extends UIPluginHookName> = (payload: UIPluginHookPayloadMap[K]) => void;
+export type UIPluginHookHandler<K extends UIPluginHookName> = (payload: UIPluginHookPayloadMap[K]) => void | Promise<void>;
 
 declare global {
     interface HTMLElement {
@@ -239,6 +242,9 @@ function createHookBucket(): {
         destroy: new Set<UIPluginHookHandler<'destroy'>>(),
         init: new Set<UIPluginHookHandler<'init'>>(),
         scan: new Set<UIPluginHookHandler<'scan'>>(),
+        action: new Set<UIPluginHookHandler<'action'>>(),
+        actionComplete: new Set<UIPluginHookHandler<'actionComplete'>>(),
+        actionError: new Set<UIPluginHookHandler<'actionError'>>(),
         emit: new Set<UIPluginHookHandler<'emit'>>()
     };
 }
@@ -771,9 +777,49 @@ export const UI = (() => {
             trigger
         );
 
+        triggerHook('action', {
+            name,
+            action,
+            trigger,
+            target: host,
+            instance,
+            event
+        });
+
         if (typeof result === 'undefined') {
             warnOnce(`Action "${action}" is not available on component "${name}".`, {
                 target: describeElement(host)
+            });
+        } else if (isThenable(result)) {
+            result
+                .then((value: unknown) => {
+                    triggerHook('actionComplete', {
+                        name,
+                        action,
+                        trigger,
+                        target: host,
+                        instance,
+                        result: value
+                    });
+                })
+                .catch((error: unknown) => {
+                    triggerHook('actionError', {
+                        name,
+                        action,
+                        trigger,
+                        target: host,
+                        instance,
+                        error
+                    });
+                });
+        } else {
+            triggerHook('actionComplete', {
+                name,
+                action,
+                trigger,
+                target: host,
+                instance,
+                result
             });
         }
 
@@ -790,13 +836,19 @@ export const UI = (() => {
         }
     }
 
+    function isThenable(value: unknown): value is Promise<unknown> {
+        return Boolean(value && typeof (value as Promise<unknown>).then === 'function');
+    }
+
     function triggerHook<K extends UIPluginHookName>(
         name: K,
         payload: UIPluginHookPayloadMap[K]
     ): void {
         for (const handler of hooks[name]) {
             try {
-                handler(payload as never);
+                Promise.resolve(handler(payload as never)).catch((error) => {
+                    warnOnce(`Plugin hook "${name}" failed.`, error);
+                });
             } catch (error) {
                 warnOnce(`Plugin hook "${name}" failed.`, error);
             }

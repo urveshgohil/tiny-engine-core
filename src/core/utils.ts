@@ -75,7 +75,7 @@ export interface TinyEngineDevtoolsBridge extends TinyEngineDevtoolsSnapshot {
     clearEvents(): void;
 }
 
-const ENGINE_VERSION = '1.6.0';
+const ENGINE_VERSION = '1.7.0';
 const runtimeConfig: TinyEngineRuntimeConfig = {
     prefix: 'ui',
     debug: false,
