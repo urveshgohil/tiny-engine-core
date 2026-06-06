@@ -1,6 +1,26 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## 1.7.1 (2026-05-27)
+```bash
+├── Performance pass for DOM scan, destroy, option sync, and owner refresh paths
+├── Reduced temporary array/set allocations in core engine hot paths
+├── Faster plugin hook dispatch while preserving async hook error handling
+├── Lighter TinyRequest abort flow and request header preparation
+└── Faster UID hydration registration without regex parsing
+```
+
+## 1.7.0 (2026-05-27)
+```bash
+├── TinyRequest API client exported as `request` and `TinyRequest`
+├── Dependency-free request layer built on native fetch instead of XMLHttpRequest
+├── request.get/post/put/patch/delete helpers with automatic JSON request and response handling
+├── request.upload() for FormData, Blob/File, and object-based multipart payloads
+├── Per-request and default timeout, retry, abort, and cache controls
+├── Request, response, and error interceptors for auth headers, transforms, and centralized handling
+└── Async-safe plugin hooks plus action/actionComplete/actionError hooks for data API actions
+```
+
 ## 1.6.0 (2026-05-09)
 ```bash
 ├── UI.destroy(root?) for explicit teardown during framework unmounts, HMR, route changes, and micro-frontends

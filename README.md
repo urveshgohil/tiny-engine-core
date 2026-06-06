@@ -12,9 +12,10 @@ This core edition gives you lightweight component lifecycle management (`registe
 4. **Component lifecycle helpers:** `on()`, `destroy()`, `emit()`, etc.
 5. **Automatic initialization:** Discovers elements with configurable `ui-*` attributes (customizable prefix).
 6. **Dynamic prefix support:** `UI.config({ prefix })` + `getPrefix()` utility.
-7. **Lightweight:** approx. 6KB gzipped.
+7. **TinyRequest:** A tiny dependency-free request layer built on native fetch with timeout, retry, abort, caching, and interceptors.
+8. **Lightweight:** approx. 6KB gzipped.
 
-## 1.6.0 (2026-05-09)
+## 1.7.1 (2026-05-27)
 [CHANGELOG.md](CHANGELOG.md)
 
 
@@ -62,6 +63,7 @@ This will:
 │   ├── core/
 │   │   ├── base.ts
 │   │   ├── engine.ts
+│   │   ├── request.ts
 │   │   ├── store.ts
 │   │   ├── uid.ts
 │   │   └── utils.ts
@@ -121,7 +123,7 @@ Feel free to submit issues and pull requests to improve the framework-agnostic. 
         console.log('Data API fired:', event.detail.name);
     });
 
-    UI.emit('app:ready', { version: '1.6.0' });
+    UI.emit('app:ready', { version: '1.7.0' });
 
     // UI.init() and UI.observe() auto-run in the browser build.
     // Call stop() later if you want to remove the bus listener.
@@ -157,6 +159,34 @@ UI.config({ prefix: 'app' }); // Optional: change to 'app-'
 UI.register('tabs', Tabs);
 UI.init();
 UI.observe();
+```
+
+### v1.7.0 TinyRequest
+```js
+import { request, TinyRequest } from 'tiny-engine-core';
+
+const users = await request.get('/api/users', {
+    cache: true,
+    timeout: 5000,
+    retry: 2
+});
+
+await request.post('/api/users', {
+    name: 'Urvesh'
+});
+
+request.interceptors.request.use((url, init) => ({
+    ...init,
+    headers: {
+        ...Object.fromEntries(new Headers(init.headers)),
+        authorization: 'Bearer token'
+    }
+}));
+
+request.timeout(5000).retry(2).cache(true);
+request.abort('/api/users');
+
+const api = new TinyRequest({ baseUrl: '/api', timeout: 5000 });
 ```
 
 ### v1.6.0 Production Runtime APIs

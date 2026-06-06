@@ -1,6 +1,6 @@
 {
   "name": "tiny-engine-core",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Tiny tree-shakable core engine library",
   "type": "module",
   "main": "dist/tiny-engine.cjs.js",
@@ -15,13 +15,15 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "README.md"
   ],
   "repository": {
     "type": "git",
     "url": "https://github.com/urveshgohil/tiny-engine-core.git"
   },
-  "homepage": "https://demo.urveshgohil.in/tiny-engine/",
+  "homepage": "https://tiny-engine.urveshgohil.in/",
   "scripts": {
     "build": "gulp build",
     "watch": "gulp watch",

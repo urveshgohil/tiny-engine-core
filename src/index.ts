@@ -2,6 +2,7 @@ import { UI } from './core/engine';
 
 export { Capsule } from './core/base';
 export { CapsuleStore } from './core/store';
+export { request, TinyRequest, TinyRequestError } from './core/request';
 export { generateUID, resetUID } from './core/uid';
 
 export {
@@ -51,6 +52,17 @@ export type {
 export type {
     CapsuleInspection
 } from './core/base';
+
+export type {
+    TinyErrorInterceptor,
+    TinyRequestContext,
+    TinyRequestDefaults,
+    TinyRequestInterceptor,
+    TinyRequestMethod,
+    TinyRequestOptions,
+    TinyResponseInterceptor,
+    TinyUploadOptions
+} from './core/request';
 
 export type {
     TinyEngineRuntimeConfig,

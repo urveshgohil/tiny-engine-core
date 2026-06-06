@@ -11,11 +11,11 @@ export function generateUID(scope: string): string {
 }
 
 export function registerUID(uid: string): void {
-    const match = uid.match(/^(.*)-(\d+)$/);
-    if (!match) return;
+    const splitAt = uid.lastIndexOf('-');
+    if (splitAt < 1 || splitAt === uid.length - 1) return;
 
-    const [, scope, num] = match;
-    const n = Number(num);
+    const scope = uid.slice(0, splitAt);
+    const n = Number(uid.slice(splitAt + 1));
 
     if (!Number.isNaN(n)) {
         const current = uidMap.get(scope) ?? 0;
