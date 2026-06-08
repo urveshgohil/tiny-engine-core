@@ -73,6 +73,7 @@ This will:
 │   │   ├── core/
 │   │   │   ├── base.d.ts
 │   │   │   ├── engine.d.ts
+│   │   │   ├── request.ts
 │   │   │   ├── store.d.ts
 │   │   │   ├── uid.d.ts
 │   │   │   └── utils.d.ts
@@ -457,6 +458,7 @@ store.connect((state, action) => {
 | Devtools               | `UI.devtools()` / `window.__TINY_ENGINE__`       | Same       | Inspect runtime internals        |
 | Performance metrics    | `UI.devtools().inspect().metrics`                | Same       | Creates, scans, flush timings    |
 | Plugin system          | `UI.use(plugin)`                                 | Same       | Third-party engine extensions    |
+| Tiny request api       | { request, TinyRequest }                         | Same       | Faster runtime hot paths         |
 
 
 ### Contributing
