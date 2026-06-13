@@ -1,19 +1,28 @@
 {
   "name": "tiny-engine-core",
-  "version": "1.7.1",
+  "version": "1.8.0",
   "description": "Tiny tree-shakable core engine library",
   "type": "module",
-  "main": "dist/tiny-engine.cjs.js",
+  "main": "dist/tiny-engine.cjs",
   "module": "dist/tiny-engine.esm.js",
   "types": "dist/types/index.d.ts",
   "exports": {
     ".": {
       "import": "./dist/tiny-engine.esm.js",
-      "require": "./dist/tiny-engine.cjs.js",
+      "require": "./dist/tiny-engine.cjs",
       "browser": "./dist/tiny-engine.min.js",
       "types": "./dist/types/index.d.ts"
-    }
+    },
+    "./data-grid": {
+      "import": "./dist/data-grid/index.esm.js",
+      "require": "./dist/data-grid/index.cjs",
+      "types": "./dist/types/data-grid/index.d.ts"
+    },
+    "./data-grid/style.css": "./dist/data-grid/style.css"
   },
+  "sideEffects": [
+    "**/*.css"
+  ],
   "files": [
     "dist",
     "LICENSE",
@@ -26,6 +35,7 @@
   "homepage": "https://tiny-engine.urveshgohil.in/",
   "scripts": {
     "build": "gulp build",
+    "test:ssr": "node scripts/ssr-smoke.mjs",
     "watch": "gulp watch",
     "release": "gulp release",
     "bump-patch": "gulp bump:patch",

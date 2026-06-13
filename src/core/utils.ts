@@ -75,7 +75,7 @@ export interface TinyEngineDevtoolsBridge extends TinyEngineDevtoolsSnapshot {
     clearEvents(): void;
 }
 
-const ENGINE_VERSION = '1.7.0';
+const ENGINE_VERSION = '1.8.0';
 const runtimeConfig: TinyEngineRuntimeConfig = {
     prefix: 'ui',
     debug: false,
@@ -168,6 +168,12 @@ function syncBridge(): TinyEngineDevtoolsBridge {
 
 export function getRuntimeConfig(): TinyEngineRuntimeConfig {
     return runtimeConfig;
+}
+
+export function canUseDOM(): boolean {
+    return typeof window !== 'undefined' &&
+        typeof document !== 'undefined' &&
+        typeof document.createElement === 'function';
 }
 
 export function updateRuntimeConfig(next: Partial<TinyEngineRuntimeConfig>): TinyEngineRuntimeConfig {

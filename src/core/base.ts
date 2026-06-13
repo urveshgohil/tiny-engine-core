@@ -1,6 +1,5 @@
 import { generateUID, registerUID } from './uid';
 import type { CapsuleStore, CapsuleListener } from './store';
-import { getPrefix } from './engine';
 import { debugLog, getRuntimeConfig, pushDevtoolsEvent, warnOnce } from './utils';
 
 export type EventHandle = [
@@ -45,7 +44,7 @@ export class Capsule {
         this.el = el;
         this.options = { ...options };
 
-        const prefix = getPrefix();
+        const prefix = getRuntimeConfig().prefix;
         const idAttr = `${prefix}-id`;
         const selector = (this.constructor as typeof Capsule & { selector?: string }).selector;
         const scope = `${prefix}-${selector || this.constructor.name.toLowerCase()}`;
