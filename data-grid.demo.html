@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tiny Engine Core DataGrid Demo</title>
+    <link rel="stylesheet" href="./dist/data-grid/style.css" />
+    <script type="importmap">
+        {
+            "imports": {
+                "tiny-engine-core": "./dist/tiny-engine.esm.js",
+                "tiny-engine-core/data-grid": "./dist/data-grid/index.esm.js"
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --page-bg:
+                radial-gradient(circle at 15% 15%, rgba(243, 194, 85, 0.18), transparent 24%),
+                radial-gradient(circle at 80% 0%, rgba(49, 87, 213, 0.14), transparent 30%),
+                linear-gradient(180deg, #f5f1e8 0%, #eef4f7 100%);
+            --ink: #172033;
+            --muted: #667085;
+            --panel: rgba(255, 255, 255, 0.82);
+            --line: rgba(23, 32, 51, 0.12);
+            --accent: #3157d5;
+            --accent-soft: #eef2ff;
+            --success: #0d7a57;
+            --success-soft: #e6f7f1;
+            --display: Georgia, "Times New Roman", serif;
+            --mono: "IBM Plex Mono", "Fira Code", monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            color: var(--ink);
+            background: var(--page-bg);
+            font-family: var(--mono);
+        }
+
+        .page {
+            width: min(1220px, calc(100vw - 28px));
+            margin: 0 auto;
+            padding: 28px 0 56px;
+        }
+
+        .hero,
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: 26px;
+            background: var(--panel);
+            box-shadow: 0 18px 44px rgba(23, 32, 51, 0.08);
+            backdrop-filter: blur(14px);
+        }
+
+        .hero {
+            padding: 28px;
+            background:
+                radial-gradient(circle at top right, rgba(49, 87, 213, 0.12), transparent 34%),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.7));
+        }
+
+        .eyebrow {
+            margin: 0 0 10px;
+            color: var(--muted);
+            letter-spacing: 0.13em;
+            text-transform: uppercase;
+            font-size: 12px;
+        }
+
+        h1,
+        h2,
+        h3 {
+            margin: 0;
+            font-family: var(--display);
+        }
+
+        h1 {
+            font-size: clamp(2.5rem, 5vw, 4.6rem);
+            line-height: 0.96;
+            max-width: 10ch;
+        }
+
+        .lead {
+            max-width: 70ch;
+            margin: 16px 0 0;
+            color: var(--muted);
+            line-height: 1.7;
+        }
+
+        .meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 18px;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            font-size: 12px;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 320px minmax(0, 1fr);
+            gap: 18px;
+            margin-top: 20px;
+        }
+
+        .stack {
+            display: grid;
+            gap: 18px;
+        }
+
+        .panel {
+            padding: 20px;
+        }
+
+        .panel p {
+            margin: 10px 0 0;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .controls {
+            display: grid;
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        .control-group {
+            display: grid;
+            gap: 10px;
+            padding: 14px;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.68);
+        }
+
+        .control-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        button,
+        input,
+        select {
+            font: inherit;
+        }
+
+        button {
+            appearance: none;
+            border: 0;
+            cursor: pointer;
+            border-radius: 14px;
+            padding: 11px 14px;
+            transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn-primary {
+            background: var(--ink);
+            color: #ffffff;
+            box-shadow: 0 10px 18px rgba(23, 32, 51, 0.16);
+        }
+
+        .btn-secondary {
+            background: #ffffff;
+            color: var(--ink);
+            border: 1px solid var(--line);
+        }
+
+        .btn-success {
+            background: var(--success-soft);
+            color: var(--success);
+            border: 1px solid rgba(13, 122, 87, 0.15);
+        }
+
+        .toggle-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        .toggle-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.74);
+            border: 1px solid var(--line);
+        }
+
+        .toggle-item label {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stage {
+            display: grid;
+            gap: 18px;
+        }
+
+        .grid-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .status-box {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .log {
+            list-style: none;
+            padding: 0;
+            margin: 14px 0 0;
+            display: grid;
+            gap: 8px;
+            max-height: 280px;
+            overflow: auto;
+        }
+
+        .log li {
+            padding: 10px 12px;
+            border-radius: 14px;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.82);
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .badge {
+            display: inline-flex;
+            padding: 4px 8px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .badge[data-status="Active"] {
+            color: var(--success);
+            background: var(--success-soft);
+        }
+
+        .badge[data-status="Paused"] {
+            color: #925f12;
+            background: #fff4d7;
+        }
+
+        .badge[data-status="Draft"] {
+            color: #3157d5;
+            background: #eef2ff;
+        }
+
+        .tiny-data-grid [data-action] {
+            margin-right: 6px;
+            padding: 6px 10px;
+            border-radius: 10px;
+            border: 1px solid rgba(23, 32, 51, 0.12);
+            background: #ffffff;
+        }
+
+        code {
+            font-family: var(--mono);
+            font-size: 0.92em;
+        }
+
+        @media (max-width: 960px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <section class="hero">
+            <p class="eyebrow">Tiny Engine Core / DataGrid</p>
+            <h1>Free Grid Feature Showcase</h1>
+            <p class="lead">
+                This single-page demo exercises column visibility, column order, row actions, loading state,
+                CSV export, sticky headers, persistence, URL sync, search, sorting, pagination, and row selection.
+            </p>
+            <div class="meta">
+                <span class="pill">`persist: true`</span>
+                <span class="pill">`urlSync: true`</span>
+                <span class="pill">`stickyHeader: true`</span>
+                <span class="pill">SSR-safe imports stay untouched</span>
+            </div>
+        </section>
+
+        <section class="layout">
+            <aside class="stack">
+                <article class="panel">
+                    <p class="eyebrow">Controls</p>
+                    <h2>Feature Switches</h2>
+                    <div class="controls">
+                        <div class="control-group">
+                            <h3>Column Visibility</h3>
+                            <div id="columnToggles" class="toggle-list"></div>
+                        </div>
+
+                        <div class="control-group">
+                            <h3>Column Order</h3>
+                            <div class="control-row">
+                                <button class="btn-secondary" type="button" id="moveNameRight">Move Name Right</button>
+                                <button class="btn-secondary" type="button" id="resetOrder">Reset Order</button>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <h3>Loading + Export</h3>
+                            <div class="control-row">
+                                <button class="btn-primary" type="button" id="toggleLoading">Toggle Loading</button>
+                                <button class="btn-success" type="button" id="exportCsv">Export CSV</button>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <h3>State Helpers</h3>
+                            <p>
+                                Search, page, page size, sort, selected rows, visible columns, and column order are
+                                persisted under <code>users-grid-demo</code>.
+                            </p>
+                            <div class="control-row">
+                                <button class="btn-secondary" type="button" id="clearStorage">Clear Persisted State</button>
+                                <button class="btn-secondary" type="button" id="reloadPage">Reload Page</button>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="panel">
+                    <p class="eyebrow">Events</p>
+                    <h2>Live Event Log</h2>
+                    <p>
+                        Interact with the grid and watch <code>row:click</code>, <code>row:select</code>,
+                        <code>column:visibility</code>, <code>column:reorder</code>, <code>sort</code>,
+                        <code>search</code>, <code>page:change</code>, and <code>action</code>.
+                    </p>
+                    <ul id="eventLog" class="log"></ul>
+                </article>
+            </aside>
+
+            <section class="stage">
+                <article class="panel">
+                    <div class="grid-toolbar">
+                        <div>
+                            <p class="eyebrow">Grid</p>
+                            <h2>Users Grid</h2>
+                        </div>
+                        <div class="status-box">
+                            <span id="summary" class="pill">Ready</span>
+                            <span id="urlState" class="pill">URL synced</span>
+                        </div>
+                    </div>
+                    <div id="gridHost"></div>
+                </article>
+            </section>
+        </section>
+    </main>
+
+    <script type="module">
+        import { DataGrid } from './dist/data-grid/index.esm.js';
+
+        const rows = [
+            { id: 1, name: 'Ada Lovelace', email: 'ada@tiny.dev', status: 'Active', team: 'Platform', score: 98 },
+            { id: 2, name: 'Grace Hopper', email: 'grace@tiny.dev', status: 'Paused', team: 'Research', score: 91 },
+            { id: 3, name: 'Linus Torvalds', email: 'linus@tiny.dev', status: 'Active', team: 'Runtime', score: 95 },
+            { id: 4, name: 'Margaret Hamilton', email: 'margaret@tiny.dev', status: 'Draft', team: 'Navigation', score: 88 },
+            { id: 5, name: 'Radia Perlman', email: 'radia@tiny.dev', status: 'Active', team: 'Network', score: 97 },
+            { id: 6, name: 'Barbara Liskov', email: 'barbara@tiny.dev', status: 'Paused', team: 'Language', score: 86 },
+            { id: 7, name: 'Ken Thompson', email: 'ken@tiny.dev', status: 'Draft', team: 'Compiler', score: 89 },
+            { id: 8, name: 'Donald Knuth', email: 'donald@tiny.dev', status: 'Active', team: 'Algorithms', score: 99 }
+        ];
+
+        const columns = [
+            { field: 'name', title: 'Name', width: '24%' },
+            { field: 'email', title: 'Email', width: '24%' },
+            {
+                field: 'status',
+                title: 'Status',
+                render: (value) => `<span class="badge" data-status="${value}">${value}</span>`
+            },
+            { field: 'team', title: 'Team' },
+            { field: 'score', title: 'Score', align: 'end' },
+            {
+                field: 'actions',
+                title: 'Actions',
+                sortable: false,
+                filterable: false,
+                render: (_, row) => `
+                    <button data-action="edit" data-row-id="${row.id}">Edit</button>
+                    <button data-action="archive" data-row-id="${row.id}">Archive</button>
+                `
+            }
+        ];
+
+        const host = document.getElementById('gridHost');
+        const summary = document.getElementById('summary');
+        const urlState = document.getElementById('urlState');
+        const eventLog = document.getElementById('eventLog');
+        const columnToggles = document.getElementById('columnToggles');
+
+        const grid = new DataGrid(host, {
+            columns,
+            rows,
+            rowKey: 'id',
+            searchable: true,
+            pagination: true,
+            pageSize: 4,
+            pageSizeOptions: [4, 6, 8],
+            selection: 'multiple',
+            stickyHeader: true,
+            persist: true,
+            persistKey: 'users-grid-demo',
+            urlSync: true,
+            emptyState: 'No records found'
+        });
+
+        const addLog = (label, detail) => {
+            const item = document.createElement('li');
+            item.textContent = `${new Date().toLocaleTimeString()}  ${label}  ${JSON.stringify(detail)}`;
+            eventLog.prepend(item);
+
+            while (eventLog.children.length > 10) {
+                eventLog.removeChild(eventLog.lastElementChild);
+            }
+        };
+
+        const renderSummary = () => {
+            const view = grid.getView();
+            summary.textContent = `${view.filteredCount} rows • page ${view.page}/${view.pageCount} • visible columns: ${grid.getVisibleColumns().join(', ')}`;
+            urlState.textContent = `${window.location.search || '?no-query-state'}`;
+        };
+
+        const renderColumnToggles = () => {
+            const visible = new Set(grid.getVisibleColumns());
+            columnToggles.replaceChildren();
+
+            columns
+                .filter((column) => column.field !== 'actions')
+                .forEach((column) => {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'toggle-item';
+
+                    const label = document.createElement('label');
+                    const input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.checked = visible.has(column.field);
+                    input.addEventListener('change', () => {
+                        grid.toggleColumn(column.field);
+                        renderColumnToggles();
+                        renderSummary();
+                    });
+
+                    const text = document.createElement('span');
+                    text.textContent = column.title;
+                    label.append(input, text);
+                    wrapper.append(label);
+                    columnToggles.append(wrapper);
+                });
+        };
+
+        grid.on('row:click', (detail) => addLog('row:click', { id: detail.row.id, name: detail.row.name }));
+        grid.on('row:select', (detail) => {
+            addLog('row:select', { selectedKeys: detail.selectedKeys });
+            renderSummary();
+        });
+        grid.on('column:visibility', (detail) => {
+            addLog('column:visibility', detail);
+            renderSummary();
+        });
+        grid.on('column:reorder', (detail) => {
+            addLog('column:reorder', detail);
+            renderSummary();
+        });
+        grid.on('sort', (detail) => {
+            addLog('sort', detail);
+            renderSummary();
+        });
+        grid.on('search', (detail) => {
+            addLog('search', detail);
+            renderSummary();
+        });
+        grid.on('page:change', (detail) => {
+            addLog('page:change', detail);
+            renderSummary();
+        });
+        grid.on('action', (detail) => addLog('action', { action: detail.action, id: detail.row.id, name: detail.row.name }));
+
+        document.getElementById('moveNameRight').addEventListener('click', () => {
+            const order = grid.getColumnOrder();
+            const fromIndex = order.indexOf('name');
+            if (fromIndex >= 0 && fromIndex < order.length - 1) {
+                grid.moveColumn(fromIndex, fromIndex + 1);
+            }
+            renderSummary();
+        });
+
+        document.getElementById('resetOrder').addEventListener('click', () => {
+            grid.setColumnOrder(columns.map((column) => column.field));
+            renderSummary();
+        });
+
+        document.getElementById('toggleLoading').addEventListener('click', () => {
+            const active = grid.loading();
+            grid.loading(!active);
+            renderSummary();
+        });
+
+        document.getElementById('exportCsv').addEventListener('click', () => {
+            grid.exportCSV('tiny-engine-users.csv');
+            addLog('exportCSV', { file: 'tiny-engine-users.csv' });
+        });
+
+        document.getElementById('clearStorage').addEventListener('click', () => {
+            localStorage.removeItem('users-grid-demo');
+            addLog('persist:clear', { key: 'users-grid-demo' });
+        });
+
+        document.getElementById('reloadPage').addEventListener('click', () => {
+            window.location.reload();
+        });
+
+        renderColumnToggles();
+        renderSummary();
+        addLog('demo:ready', { message: 'DataGrid showcase mounted' });
+    </script>
+</body>
+</html>

@@ -2,6 +2,7 @@ import { Capsule, CapsuleInspection, CapsuleOptions } from './base';
 import type { CapsuleListener, CapsuleStore } from './store';
 import {
     debugLog,
+    canUseDOM,
     describeElement,
     getDataAction,
     getDataTarget,
@@ -493,7 +494,7 @@ export const UI = (() => {
     }
 
     function scan(root?: ParentNode | null): void {
-        if (typeof document === 'undefined' || root === null) {
+        if (!canUseDOM() || root === null) {
             return;
         }
 
@@ -516,7 +517,7 @@ export const UI = (() => {
     }
 
     function init(root?: ParentNode | null): void {
-        if (typeof document === 'undefined' || root === null) {
+        if (!canUseDOM() || root === null) {
             return;
         }
 
@@ -566,7 +567,7 @@ export const UI = (() => {
     }
 
     function destroy(root?: ParentNode | null): void {
-        if (typeof document === 'undefined' || root === null) {
+        if (!canUseDOM() || root === null) {
             return;
         }
 
@@ -652,9 +653,14 @@ export const UI = (() => {
         }
     }
 
-    const observer = typeof MutationObserver === 'undefined'
-        ? null
-        : new MutationObserver((mutations) => {
+    let observer: MutationObserver | null = null;
+
+    function getObserver(): MutationObserver | null {
+        if (observer || typeof MutationObserver === 'undefined') {
+            return observer;
+        }
+
+        observer = new MutationObserver((mutations) => {
             for (const mutation of mutations) {
                 if (mutation.type === 'childList') {
                     for (const node of mutation.addedNodes) {
@@ -683,14 +689,22 @@ export const UI = (() => {
             }
         });
 
+        return observer;
+    }
+
     function observe(): void {
-        if (observing || typeof document === 'undefined' || !observer) {
+        if (observing || !canUseDOM()) {
+            return;
+        }
+
+        const activeObserver = getObserver();
+        if (!activeObserver) {
             return;
         }
 
         observing = true;
         bindDataApi();
-        observer.observe(document.documentElement, {
+        activeObserver.observe(document.documentElement, {
             childList: true,
             subtree: true,
             attributes: true
@@ -741,7 +755,7 @@ export const UI = (() => {
     }
 
     function bindDataApi(): void {
-        if (dataApiBound || typeof document === 'undefined') {
+        if (dataApiBound || !canUseDOM()) {
             return;
         }
 

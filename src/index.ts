@@ -14,11 +14,13 @@ export {
     invokeAction,
     collectDirectives,
     collectRefs,
+    canUseDOM,
     getDevtoolsBridge,
     getDevtoolsSnapshot
 } from './core/utils';
 
 export { UI, getPrefix } from './core/engine';
+export * from './data-grid';
 
 export type {
     EventHandle,
@@ -84,7 +86,7 @@ declare global {
     }
 }
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     (window as any).UI = UI;
 
     if (document.readyState === 'loading') {

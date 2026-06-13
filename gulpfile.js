@@ -12,6 +12,16 @@ const execAsync = promisify(exec);
 const pkg = JSON.parse(fs.readFileSync('./package.json'));
 const banner = `/*! ${pkg.name} v${pkg.version} | (c) ${new Date().getFullYear()} | MIT License */\n`;
 
+const dataGridExternalCorePlugin = {
+    name: 'data-grid-external-core',
+    setup(build) {
+        build.onResolve({ filter: /^\.\.\/core\/base$/ }, () => ({
+            path: 'tiny-engine-core',
+            external: true
+        }));
+    }
+};
+
 // JavaScript Builds
 const javascriptIifeTask = () => gulp.src(['src/index.ts'])
     .pipe(esbuild({
@@ -46,18 +56,47 @@ const javascriptCjsTask = () => gulp.src(['src/index.ts'])
         sourcemap: true,
         target: ['es2018'],
         banner: { js: banner },
-        outfile: 'tiny-engine.cjs.js'
+        outfile: 'tiny-engine.cjs'
     }))
     .pipe(gulp.dest('dist'));
+
+const dataGridEsmTask = () => gulp.src(['src/data-grid/index.ts'])
+    .pipe(esbuild({
+        bundle: true,
+        format: 'esm',
+        minify: true,
+        sourcemap: true,
+        target: ['es2018'],
+        plugins: [dataGridExternalCorePlugin],
+        banner: { js: banner },
+        outfile: 'index.esm.js'
+    }))
+    .pipe(gulp.dest('dist/data-grid'));
+
+const dataGridCjsTask = () => gulp.src(['src/data-grid/index.ts'])
+    .pipe(esbuild({
+        bundle: true,
+        format: 'cjs',
+        minify: true,
+        sourcemap: true,
+        target: ['es2018'],
+        plugins: [dataGridExternalCorePlugin],
+        banner: { js: banner },
+        outfile: 'index.cjs'
+    }))
+    .pipe(gulp.dest('dist/data-grid'));
+
+const dataGridCssTask = () => gulp.src(['src/data-grid/style.css'])
+    .pipe(gulp.dest('dist/data-grid'));
 
 // Types
 const typesTask = async () => {
     await execAsync('npx tsc --emitDeclarationOnly --outDir dist/types');
 };
 
-// Clean task - BUILT-IN GULP (no del needed)
-const cleanTask = () => gulp.src('dist', { read: false, allowEmpty: true })
-    .pipe(gulp.dest('.')); // Gulp's built-in clean pattern
+const cleanTask = async () => {
+    await fs.promises.rm('dist', { recursive: true, force: true });
+};
 
 // Watch task
 const watchTask = () => gulp.watch(['src/**/*.ts', 'src/**/*.d.ts'], gulp.series('build'));
@@ -82,8 +121,19 @@ gulp.task('clean', cleanTask);
 gulp.task('javascript:iife', javascriptIifeTask);
 gulp.task('javascript:esm', javascriptEsmTask);
 gulp.task('javascript:cjs', javascriptCjsTask);
+gulp.task('data-grid:esm', dataGridEsmTask);
+gulp.task('data-grid:cjs', dataGridCjsTask);
+gulp.task('data-grid:css', dataGridCssTask);
 gulp.task('types', typesTask);
-gulp.task('build', gulp.series('clean', gulp.parallel('javascript:iife', 'javascript:esm', 'javascript:cjs', 'types')));
+gulp.task('build', gulp.series('clean', gulp.parallel(
+    'javascript:iife',
+    'javascript:esm',
+    'javascript:cjs',
+    'data-grid:esm',
+    'data-grid:cjs',
+    'data-grid:css',
+    'types'
+)));
 gulp.task('watch', watchTask);
 gulp.task('bump:patch', () => bumpVersion('patch'));
 gulp.task('bump:minor', () => bumpVersion('minor'));

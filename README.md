@@ -14,8 +14,9 @@ This core edition gives you lightweight component lifecycle management (`registe
 6. **Dynamic prefix support:** `UI.config({ prefix })` + `getPrefix()` utility.
 7. **TinyRequest:** A tiny dependency-free request layer built on native fetch with timeout, retry, abort, caching, and interceptors.
 8. **Lightweight:** approx. 6KB gzipped.
+9. **SSR-safe imports:** ESM, CommonJS, and DataGrid exports can load without browser globals.
 
-## 1.7.1 (2026-05-27)
+## 1.8.0 (2026-06-10)
 [CHANGELOG.md](CHANGELOG.md)
 
 
@@ -67,20 +68,10 @@ This will:
 │   │   ├── store.ts
 │   │   ├── uid.ts
 │   │   └── utils.ts
+│   ├── featuer-file/
+│   │   ├── featuer-file.ts
+│   │   └── index.ts
 │   └── index.ts
-├── dist/              # Compiled output
-│   ├── types/
-│   │   ├── core/
-│   │   │   ├── base.d.ts
-│   │   │   ├── engine.d.ts
-│   │   │   ├── request.ts
-│   │   │   ├── store.d.ts
-│   │   │   ├── uid.d.ts
-│   │   │   └── utils.d.ts
-│   │   └── index.d.ts
-│   ├── tiny-engine.min.js
-│   ├── tiny-engine.esm.js
-│   ├── tiny-engine.cjs.js
 ├── gulpfile.js        # Build automation (Gulp + Esbuild)
 ├── package.json       # Metadata & dependencies
 ├── README.md
@@ -161,6 +152,96 @@ UI.register('tabs', Tabs);
 UI.init();
 UI.observe();
 ```
+
+### v1.8.0 DataGrid
+```js
+import { UI, createDataGridPlugin } from 'tiny-engine-core';
+import 'tiny-engine-core/data-grid/style.css';
+
+UI.use(createDataGridPlugin());
+
+UI.getOrCreate(document.querySelector('[ui-data-grid]'), 'data-grid', {
+    columns: [
+        { id: 'name', header: 'Name' },
+        { id: 'role', header: 'Role' }
+    ],
+    rows: users,
+    rowKey: 'id',
+    searchable: true,
+    pagination: true,
+    pageSize: 10,
+    pageSizeOptions: [10, 25, 50],
+    selection: 'multiple'
+});
+```
+
+The header checkbox selects or clears the visible page. Sorting is enabled by
+default and can be disabled per column with `sortable: false`.
+
+You can also import the class directly:
+
+```js
+import { DataGrid } from 'tiny-engine-core/data-grid';
+import { DataGrid as RootDataGrid } from 'tiny-engine-core';
+```
+
+### Free DataGrid Foundation
+
+```js
+const grid = UI.getOrCreate(document.querySelector('[ui-data-grid]'), 'data-grid', {
+    columns: [
+        { field: 'name', title: 'Name' },
+        { field: 'email', title: 'Email' },
+        {
+            field: 'status',
+            title: 'Status',
+            render: (value) => `<span class="badge">${value}</span>`
+        },
+        {
+            field: 'actions',
+            title: 'Actions',
+            sortable: false,
+            filterable: false,
+            render: (_, row) => `
+                <button data-action="edit" data-id="${row.id}">Edit</button>
+                <button data-action="delete" data-id="${row.id}">Delete</button>
+            `
+        }
+    ],
+    rows: users,
+    rowKey: 'id',
+    searchable: true,
+    pagination: true,
+    stickyHeader: true,
+    persist: true,
+    persistKey: 'users-grid',
+    urlSync: true,
+    emptyState: 'No records found'
+});
+
+grid.hideColumn('email');
+grid.moveColumn(0, 1);
+grid.loading(true);
+grid.loading(false);
+grid.exportCSV('users.csv');
+
+const offAction = grid.on('action', (detail) => {
+    console.log(detail.action, detail.row);
+});
+
+const offVisibility = grid.on('column:visibility', (detail) => {
+    console.log(detail.visibleColumns);
+});
+```
+
+Supported free foundation features include:
+
+1. Column visibility with `showColumn()`, `hideColumn()`, `toggleColumn()`, and `getVisibleColumns()`
+2. Column ordering with `moveColumn()`, `setColumnOrder()`, and `getColumnOrder()`
+3. Action-cell event delegation through `grid.on('action', handler)`
+4. Loading rows, sticky header mode, custom empty state text, and HTML renderers
+5. CSV export for the current filtered and sorted dataset
+6. Optional browser-only persistence and URL query sync without breaking SSR imports
 
 ### v1.7.0 TinyRequest
 ```js
@@ -286,41 +367,40 @@ class MyComponent extends Capsule {
 
 ### React Functional Component
 
+Instantiate capsules in an effect, never during React render. Module imports are
+safe on the server; DOM work begins only when the effect runs in the browser.
+
 ```jsx
 import { useEffect, useRef } from 'react';
 import { UI } from 'tiny-engine-core';
 
-UI.config({ prefix: 'app' });
-UI.register('modal', (el, api) => {
-    const setState = (open) => {
-        api.props.open = open;
-        el.setAttribute('data-state', open ? 'open' : 'closed');
-        UI.emit('modal:change', { open, id: api.uid });
-    };
+let modalRegistered = false;
 
-    return {
+function registerModal() {
+    if (modalRegistered) return;
+
+    UI.config({ prefix: 'app', hydrate: true });
+    UI.register('modal', (el, api) => ({
         open() {
-            setState(true);
+            api.props.open = true;
+            el.setAttribute('data-state', 'open');
+            UI.emit('modal:change', { open: true, id: api.uid });
         },
         close() {
-            const event = api.emit('before:close', null, { cancelable: true });
-            if (event.defaultPrevented) return false;
-
-            setState(false);
-            return true;
-        },
-        toggle() {
-            if (api.props.open) return this.close();
-            this.open();
-            return true;
+            api.props.open = false;
+            el.setAttribute('data-state', 'closed');
+            UI.emit('modal:change', { open: false, id: api.uid });
         }
-    };
-});
+    }));
+    modalRegistered = true;
+}
 
 export function ModalDemo() {
     const hostRef = useRef(null);
 
     useEffect(() => {
+        registerModal();
+
         const host = hostRef.current;
         if (!host) return;
 
@@ -352,6 +432,63 @@ export function ModalDemo() {
     );
 }
 ```
+
+### Next.js App Router
+
+Use a Client Component as the integration boundary. Next.js may render its HTML
+on the server, but Tiny Engine creation still runs after hydration in the browser.
+
+```jsx
+'use client';
+
+import { useEffect, useRef } from 'react';
+import { UI, createDataGridPlugin } from 'tiny-engine-core';
+import 'tiny-engine-core/data-grid/style.css';
+
+let dataGridRegistered = false;
+
+export function UsersGrid({ rows }) {
+    const hostRef = useRef(null);
+    const gridRef = useRef(null);
+
+    useEffect(() => {
+        if (!dataGridRegistered) {
+            UI.config({ hydrate: true });
+            UI.use(createDataGridPlugin());
+            dataGridRegistered = true;
+        }
+
+        const host = hostRef.current;
+        if (!host) return;
+
+        gridRef.current = UI.getOrCreate(host, 'data-grid', {
+            columns: [
+                { id: 'name', header: 'Name' },
+                { id: 'email', header: 'Email' }
+            ],
+            rows: [],
+            rowKey: 'id',
+            pagination: true,
+            pageSize: 10
+        });
+
+        return () => {
+            gridRef.current = null;
+            UI.destroy(host);
+        };
+    }, []);
+
+    useEffect(() => {
+        gridRef.current?.setRows(rows);
+    }, [rows]);
+
+    return <div ref={hostRef} ui-data-grid />;
+}
+```
+
+`hydrate: true` reuses existing capsule IDs and skips unchanged option syncs.
+Tiny Engine does not replace React hydration; React owns the component tree and
+Tiny Engine enhances the referenced host after hydration.
 
 ### Functional Capsule
 

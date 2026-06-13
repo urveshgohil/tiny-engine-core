@@ -1,6 +1,18 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## 1.8.0 (2026-06-10)
+```bash
+|-- DataGrid moved into Core with root and `tiny-engine-core/data-grid` exports
+|-- Client-side column sorting and stable custom comparators
+|-- Single and multiple row selection with a current-page header checkbox
+|-- Optional pagination with previous/next controls and selectable page sizes
+|-- Search, formatted cells, selection events, and imperative grid APIs
+|-- SSR-safe ESM/CommonJS imports with lazy MutationObserver creation
+|-- React and Next.js client-effect integration guidance with hydration cleanup
+`-- Standalone DataGrid stylesheet at `tiny-engine-core/data-grid/style.css`
+```
+
 ## 1.7.1 (2026-05-27)
 ```bash
 ├── Performance pass for DOM scan, destroy, option sync, and owner refresh paths
