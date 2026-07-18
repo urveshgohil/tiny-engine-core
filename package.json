@@ -8,15 +8,15 @@
   "types": "dist/types/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/tiny-engine.esm.js",
-      "require": "./dist/tiny-engine.cjs",
+      "types": "./dist/types/index.d.ts",
       "browser": "./dist/tiny-engine.min.js",
-      "types": "./dist/types/index.d.ts"
+      "import": "./dist/tiny-engine.esm.js",
+      "require": "./dist/tiny-engine.cjs"
     },
     "./data-grid": {
+      "types": "./dist/types/data-grid/index.d.ts",
       "import": "./dist/data-grid/index.esm.js",
-      "require": "./dist/data-grid/index.cjs",
-      "types": "./dist/types/data-grid/index.d.ts"
+      "require": "./dist/data-grid/index.cjs"
     },
     "./data-grid/style.css": "./dist/data-grid/style.css"
   },
@@ -34,15 +34,19 @@
   },
   "homepage": "https://tiny-engine.urveshgohil.in/",
   "scripts": {
-    "build": "gulp build",
+    "build": "node scripts/build.mjs",
+    "clean": "node scripts/build.mjs --clean",
+    "typecheck": "tsc --noEmit",
     "test:ssr": "node scripts/ssr-smoke.mjs",
-    "watch": "gulp watch",
-    "release": "gulp release",
-    "bump-patch": "gulp bump:patch",
-    "bump-minor": "gulp bump:minor",
-    "bump-major": "gulp bump:major",
-    "dev": "gulp",
-    "demo": "node scripts/demo-server.mjs"
+    "verify": "node node_modules/typescript/bin/tsc --noEmit && node scripts/build.mjs && node scripts/ssr-smoke.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "release": "node scripts/release.mjs",
+    "bump-patch": "node scripts/version.mjs patch",
+    "bump-minor": "node scripts/version.mjs minor",
+    "bump-major": "node scripts/version.mjs major",
+    "dev": "node scripts/build.mjs --watch",
+    "demo": "node scripts/demo-server.mjs",
+    "prepare": "husky"
   },
   "keywords": [
     "tiny",
@@ -58,12 +62,9 @@
   "author": "Urvesh Gohil",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^25.6.2",
+    "@types/node": "^26.1.1",
     "esbuild": "^0.28.0",
-    "gulp": "^5.0.1",
-    "gulp-bump": "^3.2.0",
-    "gulp-esbuild": "^0.14.1",
-    "gulp-git": "^2.11.0",
-    "typescript": "^5.9.3"
+    "husky": "^9.1.7",
+    "typescript": "^7.0.2"
   }
 }

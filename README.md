@@ -72,7 +72,7 @@ This will:
 │   │   ├── featuer-file.ts
 │   │   └── index.ts
 │   └── index.ts
-├── gulpfile.js        # Build automation (Gulp + Esbuild)
+├── scripts/build.mjs  # Build automation (esbuild + TypeScript)
 ├── package.json       # Metadata & dependencies
 ├── README.md
 └── tsconfig.json
@@ -80,23 +80,22 @@ This will:
 
 ## Build Tools
 ```bash
-gulp              # Build all formats + watch
-gulp types        # Types mode only
-gulp release      # Bump patch + build + git commit/tag
-gulp watch        # Watch mode only
-gulp bump:patch   # Bump patch version (bug fixes)
-gulp bump:minor   # Bump minor version (new features)
-gulp bump:major   # Bump major version (breaking)
+pnpm dev          # Build all formats + watch
+pnpm build        # Build all formats once
+pnpm release      # Bump patch + build + git commit/tag
+pnpm watch        # Watch mode only
+pnpm bump-patch   # Bump patch version (bug fixes)
+pnpm bump-minor   # Bump minor version (new features)
+pnpm bump-major   # Bump major version (breaking)
 ```
 
-### Gulp Tasks
+### Package Scripts
 1. javascript: Bundles and minifies JavaScript using Esbuild.
 
 ### Build Pipeline
-1. Gulp 5.0.1 → task runner
+1. Node.js scripts → build orchestration, version management, release commits, and tagging
 2. Esbuild 0.28.0 → fast bundling and minification
-3. gulp-bump 3.2.0 → version management
-4. gulp-git 2.11.0 → commit and tagging automation
+3. TypeScript 7.0.2 → declaration generation and type checking
 
 ### Contributing
 Feel free to submit issues and pull requests to improve the framework-agnostic. Contributions are welcome!
